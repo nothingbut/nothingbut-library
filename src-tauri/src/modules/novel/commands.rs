@@ -200,7 +200,7 @@ pub async fn get_chapter_content(
 
     // Get chapter info from database
     let chapter = database::get_chapter(&pool, chapterId).await?
-        .ok_or_else(|| crate::AppError::Validation(format!("Chapter {} not found", chapter_id)))?;
+        .ok_or_else(|| crate::AppError::Validation(format!("Chapter {} not found", chapterId)))?;
 
     // Read content from file
     let file_path = workspace.join(&chapter.file_path);
