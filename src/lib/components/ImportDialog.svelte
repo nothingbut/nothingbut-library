@@ -1,6 +1,6 @@
 <script lang="ts">
   import { open } from '@tauri-apps/plugin-dialog';
-  import { previewImport, importNovel, createCategory } from '$lib/services/api';
+  import { previewImport, importNovel, createCategory, listCategories } from '$lib/services/api';
   import type { ImportPreview } from '$lib/services/api';
 
   // Props
@@ -72,18 +72,25 @@
       console.log('Parsing file:', {
         file: selectedFile,
         title,
-        author: author || '未知作者',
         category: category || '未分类'
       });
 
       preview = await previewImport(
         selectedFile,
         title,
-        author || '未知作者',
         category || '未分类'
       );
 
       console.log('Parse successful:', preview);
+
+      // Use auto-extracted metadata if available
+      if (preview.author) {
+        author = preview.author;
+      }
+      if (preview.description) {
+        description = preview.description;
+      }
+
       step = 'edit';
     } catch (e) {
       console.error('Parse error details:', e);
@@ -111,13 +118,36 @@
       step = 'importing';
       error = null;
 
-      // Create category if needed
+      // Parse category (format: "主分类/子分类" or just "主分类")
       let categoryId: number | undefined;
       if (category) {
+        const parts = category.split('/').map(s => s.trim());
+        const mainCategory = parts[0];
+        const subCategory = parts[1];
+
         try {
-          categoryId = await createCategory(category, undefined, 0);
+          // Check if main category exists, create if not
+          const categories = await listCategories();
+          let mainCat = categories.find(c => c.name === mainCategory && !c.parent_id);
+
+          if (!mainCat) {
+            const mainId = await createCategory(mainCategory, undefined, 0);
+            mainCat = { id: mainId, name: mainCategory, parent_id: null, sort_order: 0, created_at: '' };
+          }
+
+          // If subcategory specified, handle it
+          if (subCategory) {
+            let subCat = categories.find(c => c.name === subCategory && c.parent_id === mainCat!.id);
+            if (!subCat) {
+              categoryId = await createCategory(subCategory, mainCat.id, 0);
+            } else {
+              categoryId = subCat.id;
+            }
+          } else {
+            categoryId = mainCat.id;
+          }
         } catch (e) {
-          console.warn('Failed to create category, continuing without it:', e);
+          console.warn('Failed to handle category:', e);
         }
       }
 
