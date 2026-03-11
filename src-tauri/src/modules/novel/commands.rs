@@ -209,3 +209,14 @@ pub async fn get_chapter_content(
 
     Ok(content)
 }
+
+/// Seed categories from bsconfig.json
+#[tauri::command]
+pub async fn seed_categories(
+    pool: State<'_, SqlitePool>,
+    #[allow(non_snake_case)]
+    configPath: String,
+) -> AppResult<usize> {
+    let path = Path::new(&configPath);
+    super::seed::seed_categories_from_config(&pool, path).await
+}

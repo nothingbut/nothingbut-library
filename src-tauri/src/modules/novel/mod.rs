@@ -1,7 +1,10 @@
 pub mod commands;
+#[cfg(test)]
+mod commands_test;
 pub mod database;
 pub mod models;
 pub mod parser;
+pub mod seed;
 pub mod storage;
 
 pub use models::{
@@ -14,3 +17,4 @@ pub use commands::{
     preview_import, import_novel, list_books, list_chapters,
     create_category, list_categories,
 };
+pub use seed::seed_categories_from_config;

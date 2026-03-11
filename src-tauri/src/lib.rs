@@ -98,6 +98,7 @@ pub fn run() {
             modules::novel::commands::get_chapter_content,
             modules::novel::commands::create_category,
             modules::novel::commands::list_categories,
+            modules::novel::commands::seed_categories,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
