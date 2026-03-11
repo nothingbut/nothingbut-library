@@ -7,4 +7,4 @@ pub use models::{
     ImportPreview,
 };
 pub use parser::{TxtParser, Chapter, DetectedEncoding};
-pub use storage::{BookMetadata, create_book_dir, save_chapter, save_metadata, load_metadata};
+pub use storage::{BookMetadata, count_words, create_book_dir, save_chapter, save_metadata, load_metadata};

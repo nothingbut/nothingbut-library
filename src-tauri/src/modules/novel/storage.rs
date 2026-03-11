@@ -17,12 +17,12 @@ pub struct BookMetadata {
 }
 
 /// Count words in content (Chinese characters + English words)
-fn count_words(content: &str) -> usize {
+pub fn count_words(content: &str) -> usize {
     let mut count = 0;
 
     // Count Chinese characters
     for ch in content.chars() {
-        if ch >= '\u{4E00}' && ch <= '\u{9FFF}' {
+        if ('\u{4E00}'..='\u{9FFF}').contains(&ch) {
             count += 1;
         }
     }
