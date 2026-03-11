@@ -1,8 +1,10 @@
 pub mod core;
 pub mod database;
 pub mod errors;
+pub mod modules;
 
 pub use errors::{AppError, AppResult};
+pub use modules::{BookStatus, NovelBook, NovelBookmark, NovelCategory, NovelChapter, ChapterPreview, ImportPreview};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
