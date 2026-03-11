@@ -102,7 +102,6 @@ mod tests {
         let result = commands::preview_import(
             test_file.path().to_str().unwrap().to_string(),
             "测试小说".to_string(),
-            "测试作者".to_string(),
             "玄幻".to_string(),
         )
         .await;
@@ -111,12 +110,12 @@ mod tests {
         let preview = result.unwrap();
 
         assert_eq!(preview.title, "测试小说");
-        assert_eq!(preview.author, "测试作者");
         assert_eq!(preview.category, "玄幻");
         assert_eq!(preview.total_chapters, 3);
         assert_eq!(preview.chapters.len(), 3); // Shows first 3 chapters
         assert_eq!(preview.chapters[0].chapter_number, 1);
         assert_eq!(preview.chapters[0].title, "第一章 开端");
+        assert!(!preview.chapters[0].preview.is_empty()); // Has preview
         assert!(preview.total_words > 0);
     }
 
@@ -125,7 +124,6 @@ mod tests {
         let result = commands::preview_import(
             "/nonexistent/file.txt".to_string(),
             "Test".to_string(),
-            "Author".to_string(),
             "Category".to_string(),
         )
         .await;

@@ -116,6 +116,7 @@ mod tests {
         let chapter = Chapter {
             title: "第一章".to_string(),
             content: "章节内容".to_string(),
+            preview: "章节内容".to_string(),
             start_position: 0,
         };
 

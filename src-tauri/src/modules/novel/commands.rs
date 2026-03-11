@@ -8,13 +8,12 @@ use super::models::{BookStatus, ChapterPreview, ImportPreview, NovelBook, NovelC
 use super::parser::TxtParser;
 use super::storage::{count_words, create_book_dir, save_chapter, save_metadata, BookMetadata};
 
-/// Preview import - show first 3 chapters
+/// Preview import - show first 3 chapters with auto-extracted metadata
 #[tauri::command]
 pub async fn preview_import(
     #[allow(non_snake_case)]
     filePath: String,
     title: String,
-    author: String,
     category: String,
 ) -> AppResult<ImportPreview> {
     let parser = TxtParser::new();
@@ -22,6 +21,12 @@ pub async fn preview_import(
         .map_err(|e| crate::AppError::Io(format!("Failed to open file: {}", e)))?;
 
     let chapters = parser.parse(file)?;
+
+    // Re-read file to extract metadata
+    let file2 = File::open(&filePath)
+        .map_err(|e| crate::AppError::Io(format!("Failed to open file: {}", e)))?;
+    let content = parser.read_file(file2)?;
+    let metadata = parser.extract_metadata(&content);
 
     // Calculate preview (first 3 chapters)
     let preview_chapters: Vec<ChapterPreview> = chapters
@@ -33,6 +38,7 @@ pub async fn preview_import(
             ChapterPreview {
                 chapter_number: (idx + 1) as u32,
                 title: ch.title.clone(),
+                preview: ch.preview.clone(),
                 word_count: wc as u32,
             }
         })
@@ -46,7 +52,8 @@ pub async fn preview_import(
 
     Ok(ImportPreview {
         title,
-        author,
+        author: metadata.author,
+        description: metadata.description,
         category,
         chapters: preview_chapters,
         total_chapters,

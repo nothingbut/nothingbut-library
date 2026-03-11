@@ -150,109 +150,119 @@
     {:else}
       <!-- State 2 & 3: Book selected -->
       <div class="book-view">
-        {#if !selectedChapter}
-          <!-- State 2: Book metadata -->
-          <div class="book-metadata">
-            <div class="metadata-card">
-              {#if selectedBook.cover_path}
-                <img
-                  src={selectedBook.cover_path}
-                  alt={selectedBook.title}
-                  class="book-cover"
-                />
-              {:else}
-                <div class="cover-placeholder">
-                  {selectedBook.title.charAt(0)}
-                </div>
-              {/if}
-
-              <div class="metadata-info">
-                <h1 class="book-title">{selectedBook.title}</h1>
-
-                <div class="metadata-row">
-                  <span class="label">作者：</span>
-                  <span class="value">{selectedBook.author || '未知'}</span>
-                </div>
-
-                <div class="metadata-row">
-                  <span class="label">分类：</span>
-                  <span class="value">{getCategoryName(selectedBook)}</span>
-                </div>
-
-                <div class="metadata-row">
-                  <span class="label">状态：</span>
-                  <span
-                    class="status-badge"
-                    style="color: {getStatusColor(selectedBook.status)}"
-                  >
-                    {getStatusLabel(selectedBook.status)}
-                  </span>
-                </div>
-
-                <div class="metadata-row">
-                  <span class="label">字数：</span>
-                  <span class="value"
-                    >{(selectedBook.word_count / 10000).toFixed(1)} 万字</span
-                  >
-                </div>
-
-                <div class="metadata-row">
-                  <span class="label">章节：</span>
-                  <span class="value">{selectedBook.chapter_count} 章</span>
-                </div>
-
-                <div class="description">
-                  <p class="label">简介：</p>
-                  <p class="description-text">{selectedBook.description || '暂无简介'}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        {:else}
-          <!-- State 3: Chapter content -->
-          <div class="chapter-content">
-            <div class="chapter-header">
-              <h2 class="chapter-title">{selectedChapter.title}</h2>
-              <div class="chapter-toolbar">
-                <button class="toolbar-btn" title="字体大小">A</button>
-                <button class="toolbar-btn" title="主题">☀️</button>
-                <button
-                  class="toolbar-btn"
-                  onclick={() => (selectedChapter = null)}
-                >
-                  返回书籍
-                </button>
-              </div>
-            </div>
-            <div class="chapter-body">
-              <p class="chapter-text">{selectedChapter.content}</p>
-            </div>
-          </div>
-        {/if}
-
-        <!-- Chapter List (always visible when book selected) -->
-        <div class="chapter-list">
-          <h3 class="chapter-list-title">章节目录</h3>
-          <div class="chapter-items">
-            {#if loading}
-              <div class="chapter-loading">Loading...</div>
-            {:else if chapters.length === 0}
-              <div class="chapter-empty">暂无章节</div>
-            {:else}
-              {#each chapters as chapter (chapter.id)}
-                <button
-                  class="chapter-item"
-                  class:active={selectedChapter?.id === chapter.id}
-                  onclick={() => handleChapterSelect(chapter.id)}
-                >
-                  <div class="chapter-item-header">
-                    <span class="chapter-order">{chapter.sort_order}.</span>
-                    <span class="chapter-item-title">{chapter.title}</span>
-                    <span class="chapter-length">[{chapter.word_count}字]</span>
+        <!-- Upper section: Book metadata or Chapter content -->
+        <div class="upper-section">
+          {#if !selectedChapter}
+            <!-- State 2: Book metadata -->
+            <div class="book-metadata">
+              <div class="metadata-card">
+                {#if selectedBook.cover_path}
+                  <img
+                    src={selectedBook.cover_path}
+                    alt={selectedBook.title}
+                    class="book-cover"
+                  />
+                {:else}
+                  <div class="cover-placeholder">
+                    {selectedBook.title.charAt(0)}
                   </div>
-                </button>
-              {/each}
-            {/if}
+                {/if}
+
+                <div class="metadata-info">
+                  <h1 class="book-title">{selectedBook.title}</h1>
+
+                  <div class="metadata-row">
+                    <span class="label">作者：</span>
+                    <span class="value">{selectedBook.author || '未知'}</span>
+                  </div>
+
+                  <div class="metadata-row">
+                    <span class="label">分类：</span>
+                    <span class="value">{getCategoryName(selectedBook)}</span>
+                  </div>
+
+                  <div class="metadata-row">
+                    <span class="label">状态：</span>
+                    <span
+                      class="status-badge"
+                      style="color: {getStatusColor(selectedBook.status)}"
+                    >
+                      {getStatusLabel(selectedBook.status)}
+                    </span>
+                  </div>
+
+                  <div class="metadata-row">
+                    <span class="label">字数：</span>
+                    <span class="value"
+                      >{(selectedBook.word_count / 10000).toFixed(1)} 万字</span
+                    >
+                  </div>
+
+                  <div class="metadata-row">
+                    <span class="label">章节：</span>
+                    <span class="value">{selectedBook.chapter_count} 章</span>
+                  </div>
+
+                  <div class="description">
+                    <p class="label">简介：</p>
+                    <p class="description-text">{selectedBook.description || '暂无简介'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {:else}
+            <!-- State 3: Chapter content -->
+            <div class="chapter-content">
+              <div class="chapter-header">
+                <h2 class="chapter-title">{selectedChapter.title}</h2>
+                <div class="chapter-toolbar">
+                  <button class="toolbar-btn" title="字体大小">A</button>
+                  <button class="toolbar-btn" title="主题">☀️</button>
+                  <button
+                    class="toolbar-btn"
+                    onclick={() => (selectedChapter = null)}
+                  >
+                    返回书籍
+                  </button>
+                </div>
+              </div>
+              <div class="chapter-body">
+                <p class="chapter-text">{selectedChapter.content}</p>
+              </div>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Lower section: Chapter List (always visible when book selected) -->
+        <div class="lower-section">
+          <div class="chapter-list">
+            <h3 class="chapter-list-title">章节目录</h3>
+            <div class="chapter-items">
+              {#if loading}
+                <div class="chapter-loading">Loading...</div>
+              {:else if chapters.length === 0}
+                <div class="chapter-empty">暂无章节</div>
+              {:else}
+                {#each chapters as chapter (chapter.id)}
+                  <button
+                    class="chapter-item"
+                    class:active={selectedChapter?.id === chapter.id}
+                    onclick={() => handleChapterSelect(chapter.id)}
+                  >
+                    <div class="chapter-item-header">
+                      <span class="chapter-order">{chapter.sort_order}.</span>
+                      <span class="chapter-item-title">{chapter.title}</span>
+                      <span class="chapter-length">[{chapter.word_count}字]</span>
+                    </div>
+                    {#if chapter.preview}
+                      <div class="chapter-preview">
+                        {chapter.preview}
+                      </div>
+                    {/if}
+                  </button>
+                {/each}
+              {/if}
+            </div>
           </div>
         </div>
       </div>
@@ -364,12 +374,25 @@
     overflow: hidden;
   }
 
-  /* Book Metadata */
-  .book-metadata {
+  /* Upper Section (Book metadata or Chapter content) */
+  .upper-section {
     flex: 1;
     overflow-y: auto;
+    min-height: 0; /* Important for flex overflow */
+  }
+
+  /* Lower Section (Chapter List) */
+  .lower-section {
+    height: 350px;
+    flex-shrink: 0;
+    border-top: 1px solid var(--color-border);
+    background-color: var(--color-bg-primary);
+  }
+
+  /* Book Metadata */
+  .book-metadata {
     padding: 24px;
-    border-bottom: 1px solid var(--color-border);
+    height: 100%;
   }
 
   .metadata-card {
@@ -455,10 +478,8 @@
 
   /* Chapter Content */
   .chapter-content {
-    flex: 1;
-    overflow-y: auto;
     padding: 24px;
-    border-bottom: 1px solid var(--color-border);
+    height: 100%;
   }
 
   .chapter-header {
@@ -513,12 +534,9 @@
 
   /* Chapter List */
   .chapter-list {
-    height: 400px;
-    background-color: var(--color-bg-primary);
-    border-top: 1px solid var(--color-border);
+    height: 100%;
     display: flex;
     flex-direction: column;
-    flex-shrink: 0;
   }
 
   .chapter-list-title {
@@ -563,7 +581,18 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 4px;
+  }
+
+  .chapter-preview {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    margin-top: 4px;
+    padding-left: 20px;
+    line-height: 1.4;
+  }
+
+  .chapter-item.active .chapter-preview {
+    color: rgba(255, 255, 255, 0.7);
   }
 
   .chapter-order {

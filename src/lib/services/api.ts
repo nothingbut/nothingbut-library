@@ -3,11 +3,13 @@ import type { Book, Category, Chapter } from '../types';
 
 export interface ImportPreview {
 	title: string;
-	author: string;
+	author?: string | null; // Auto-extracted from file if found
+	description?: string | null; // Auto-extracted from file if found
 	category: string;
 	chapters: Array<{
 		chapter_number: number;
 		title: string;
+		preview: string; // First line preview
 		word_count: number;
 	}>;
 	total_chapters: number;
@@ -16,17 +18,16 @@ export interface ImportPreview {
 
 /**
  * Preview import - show first 3 chapters without importing
+ * Author and description are auto-extracted if found in the file
  */
 export async function previewImport(
 	filePath: string,
 	title: string,
-	author: string,
 	category: string
 ): Promise<ImportPreview> {
 	return await invoke('preview_import', {
 		filePath,
 		title,
-		author,
 		category
 	});
 }

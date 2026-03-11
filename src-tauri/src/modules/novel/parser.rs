@@ -24,7 +24,15 @@ impl DetectedEncoding {
 pub struct Chapter {
     pub title: String,
     pub content: String,
+    pub preview: String, // First line preview (up to 20 chars)
     pub start_position: usize,
+}
+
+/// Metadata extracted from novel file
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NovelMetadata {
+    pub author: Option<String>,
+    pub description: Option<String>,
 }
 
 /// TXT file parser for novels
@@ -97,12 +105,28 @@ impl TxtParser {
         Ok(text.into_owned())
     }
 
+    /// Extract preview text from content (first line, up to 20 chars)
+    fn extract_preview(content: &str) -> String {
+        let first_line = content
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .unwrap_or("");
+
+        let trimmed = first_line.trim();
+        if trimmed.chars().count() > 20 {
+            trimmed.chars().take(20).collect::<String>() + "..."
+        } else {
+            trimmed.to_string()
+        }
+    }
+
     /// Split content into chapters
     pub fn split_chapters(&self, content: &str) -> Vec<Chapter> {
         if self.chapter_patterns.is_empty() {
             // No patterns, return entire content as single chapter
             return vec![Chapter {
                 title: "全文".to_string(),
+                preview: Self::extract_preview(content),
                 content: content.to_string(),
                 start_position: 0,
             }];
@@ -122,9 +146,11 @@ impl TxtParser {
                 // Save previous chapter if exists
                 if let Some((title, start_pos, content_lines)) = current_chapter.take() {
                     let content_text = content_lines.join("\n");
+                    let trimmed_content = content_text.trim().to_string();
                     chapters.push(Chapter {
                         title,
-                        content: content_text.trim().to_string(),
+                        preview: Self::extract_preview(&trimmed_content),
+                        content: trimmed_content,
                         start_position: start_pos,
                     });
                 }
@@ -140,9 +166,11 @@ impl TxtParser {
         // Save last chapter if exists
         if let Some((title, start_pos, content_lines)) = current_chapter {
             let content_text = content_lines.join("\n");
+            let trimmed_content = content_text.trim().to_string();
             chapters.push(Chapter {
                 title,
-                content: content_text.trim().to_string(),
+                preview: Self::extract_preview(&trimmed_content),
+                content: trimmed_content,
                 start_position: start_pos,
             });
         }
@@ -151,12 +179,92 @@ impl TxtParser {
         if chapters.is_empty() {
             chapters.push(Chapter {
                 title: "全文".to_string(),
+                preview: Self::extract_preview(content),
                 content: content.to_string(),
                 start_position: 0,
             });
         }
 
         chapters
+    }
+
+    /// Extract metadata (author, description) from content
+    pub fn extract_metadata(&self, content: &str) -> NovelMetadata {
+        let mut author = None;
+        let mut description = None;
+
+        // Try to extract from first few lines
+        let lines: Vec<&str> = content.lines().take(20).collect();
+
+        for line in &lines {
+            let trimmed = line.trim();
+
+            // Try to match author patterns
+            if author.is_none() {
+                if let Some(captures) = Regex::new(r"(?i)^作者[:：\s]+(.+)$")
+                    .ok()
+                    .and_then(|re| re.captures(trimmed))
+                {
+                    author = Some(captures[1].trim().to_string());
+                    continue;
+                }
+            }
+
+            // Try to match description patterns
+            if description.is_none() {
+                if let Some(captures) = Regex::new(r"(?i)^(简介|内容简介|内容介绍)[:：\s]+(.+)$")
+                    .ok()
+                    .and_then(|re| re.captures(trimmed))
+                {
+                    description = Some(captures[2].trim().to_string());
+                    continue;
+                }
+            }
+
+            // If we found both, stop early
+            if author.is_some() && description.is_some() {
+                break;
+            }
+        }
+
+        // If description not found with prefix, try to extract first paragraph
+        if description.is_none() {
+            // Skip empty lines and find first meaningful paragraph
+            let mut paragraph_lines = Vec::new();
+            let mut in_paragraph = false;
+
+            for line in &lines {
+                let trimmed = line.trim();
+
+                // Skip chapter titles and author lines
+                let is_chapter = self.chapter_patterns.iter().any(|re| re.is_match(trimmed));
+                let is_metadata = trimmed.starts_with("作者") || trimmed.starts_with("简介");
+
+                if is_chapter || is_metadata {
+                    continue;
+                }
+
+                if !trimmed.is_empty() {
+                    in_paragraph = true;
+                    paragraph_lines.push(trimmed);
+                } else if in_paragraph {
+                    // End of paragraph
+                    break;
+                }
+            }
+
+            if !paragraph_lines.is_empty() {
+                let paragraph = paragraph_lines.join("");
+                if paragraph.chars().count() >= 10 {
+                    description = Some(paragraph);
+                }
+            }
+        }
+
+        NovelMetadata {
+            author,
+            description,
+        }
     }
 
     /// Parse a TXT file from a reader

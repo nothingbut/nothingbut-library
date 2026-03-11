@@ -81,6 +81,7 @@ pub struct NovelBook {
 pub struct ChapterPreview {
     pub chapter_number: u32,
     pub title: String,
+    pub preview: String, // First line preview (up to 20 chars)
     pub word_count: u32,
 }
 
@@ -88,7 +89,8 @@ pub struct ChapterPreview {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportPreview {
     pub title: String,
-    pub author: String,
+    pub author: Option<String>, // Auto-extracted if found
+    pub description: Option<String>, // Auto-extracted if found
     pub category: String,
     pub chapters: Vec<ChapterPreview>,
     pub total_chapters: u32,
@@ -180,17 +182,20 @@ mod tests {
     fn test_import_preview_creation() {
         let preview = ImportPreview {
             title: "Test Novel".to_string(),
-            author: "Test Author".to_string(),
+            author: Some("Test Author".to_string()),
+            description: Some("Test description".to_string()),
             category: "Fantasy".to_string(),
             chapters: vec![
                 ChapterPreview {
                     chapter_number: 1,
                     title: "Chapter 1".to_string(),
+                    preview: "This is the first...".to_string(),
                     word_count: 5000,
                 },
                 ChapterPreview {
                     chapter_number: 2,
                     title: "Chapter 2".to_string(),
+                    preview: "This is the second...".to_string(),
                     word_count: 5500,
                 },
             ],
@@ -199,6 +204,7 @@ mod tests {
         };
         assert_eq!(preview.total_chapters, 2);
         assert_eq!(preview.total_words, 10500);
+        assert_eq!(preview.author, Some("Test Author".to_string()));
     }
 
     #[test]

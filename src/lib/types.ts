@@ -35,6 +35,7 @@ export interface Chapter {
 	id: number;
 	book_id: number;
 	title: string;
+	preview?: string; // First line preview (up to 20 chars) - optional for backwards compatibility
 	file_path: string;
 	sort_order: number;
 	word_count: number;

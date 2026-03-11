@@ -13,3 +13,7 @@ vite.config.ts.timestamp-*
 *.db
 *.db-shm
 *.db-wal
+
+# Test data (temporary, for manual testing)
+/data/
+test*.txt
