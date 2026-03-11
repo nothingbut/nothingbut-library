@@ -19,7 +19,7 @@
   <!-- Toolbar -->
   <header class="toolbar">
     <div class="toolbar-left">
-      <button class="toolbar-btn" onclick={() => {}}>
+      <button class="toolbar-btn">
         📚 资料库
       </button>
     </div>
@@ -129,10 +129,6 @@
     flex: 1;
     overflow: auto;
     background-color: var(--color-bg-secondary);
-  }
-
-  .main-content.with-ai-panel .content-area {
-    flex: 1;
   }
 
   /* AI Panel styles */
