@@ -1,5 +1,6 @@
 <script lang="ts">
   import CategoryTree from '$lib/components/CategoryTree.svelte';
+  import ImportDialog from '$lib/components/ImportDialog.svelte';
   import { listBooks, listChapters, getChapterContent } from '$lib/services/api';
   import type { Book, Chapter, BookStatus } from '$lib/types';
 
@@ -9,6 +10,8 @@
   let chapters = $state<Chapter[]>([]);
   let loading = $state(false);
   let error = $state<string | null>(null);
+  let showImportDialog = $state(false);
+  let categoryTreeKey = $state(0); // For forcing re-render
 
   // Workspace path (hardcoded for now, should come from config)
   const workspacePath = '/Users/shichang/Workspace/program/.worktrees/nothingbut-mvp/claude/nothingbut-library';
@@ -100,6 +103,21 @@
     return lines[0] || '';
   }
 
+  // Open import dialog
+  function openImportDialog() {
+    showImportDialog = true;
+  }
+
+  // Handle import success - refresh the tree
+  function handleImportSuccess() {
+    // Force re-render of CategoryTree by changing key
+    categoryTreeKey += 1;
+    // Clear selection
+    selectedBook = null;
+    selectedChapter = null;
+    chapters = [];
+  }
+
 </script>
 
 <div class="novel-module">
@@ -107,10 +125,17 @@
   <aside class="category-sidebar">
     <div class="sidebar-header">
       <h2>分类</h2>
-      <button class="add-btn" title="添加分类">+</button>
+      <div class="sidebar-actions">
+        <button class="action-btn" title="导入小说" onclick={openImportDialog}>
+          📥
+        </button>
+        <button class="action-btn" title="添加分类">+</button>
+      </div>
     </div>
     <div class="sidebar-content">
-      <CategoryTree onSelectBook={handleBookSelect} />
+      {#key categoryTreeKey}
+        <CategoryTree onSelectBook={handleBookSelect} />
+      {/key}
     </div>
   </aside>
 
@@ -235,6 +260,12 @@
   </main>
 </div>
 
+<!-- Import Dialog -->
+<ImportDialog
+  bind:isOpen={showImportDialog}
+  onSuccess={handleImportSuccess}
+/>
+
 <style>
   .novel-module {
     display: flex;
@@ -268,11 +299,16 @@
     margin: 0;
   }
 
-  .add-btn {
+  .sidebar-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .action-btn {
     width: 28px;
     height: 28px;
     border-radius: 6px;
-    font-size: 18px;
+    font-size: 16px;
     color: var(--color-primary);
     background-color: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
@@ -283,7 +319,7 @@
     transition: all 0.2s ease;
   }
 
-  .add-btn:hover {
+  .action-btn:hover {
     background-color: var(--color-bg-hover);
     border-color: var(--color-primary);
   }
