@@ -1,3 +1,8 @@
+pub mod core;
+pub mod errors;
+
+pub use errors::{AppError, AppResult};
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
