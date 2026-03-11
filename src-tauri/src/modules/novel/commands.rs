@@ -11,13 +11,14 @@ use super::storage::{count_words, create_book_dir, save_chapter, save_metadata, 
 /// Preview import - show first 3 chapters
 #[tauri::command]
 pub async fn preview_import(
-    file_path: String,
+    #[allow(non_snake_case)]
+    filePath: String,
     title: String,
     author: String,
     category: String,
 ) -> AppResult<ImportPreview> {
     let parser = TxtParser::new();
-    let file = File::open(&file_path)
+    let file = File::open(&filePath)
         .map_err(|e| crate::AppError::Io(format!("Failed to open file: {}", e)))?;
 
     let chapters = parser.parse(file)?;
@@ -57,18 +58,21 @@ pub async fn preview_import(
 #[tauri::command]
 pub async fn import_novel(
     pool: State<'_, SqlitePool>,
-    workspace_path: String,
-    file_path: String,
+    #[allow(non_snake_case)]
+    workspacePath: String,
+    #[allow(non_snake_case)]
+    filePath: String,
     title: String,
     author: Option<String>,
     description: Option<String>,
-    category_id: Option<i64>,
+    #[allow(non_snake_case)]
+    categoryId: Option<i64>,
 ) -> AppResult<i64> {
-    let workspace = Path::new(&workspace_path);
+    let workspace = Path::new(&workspacePath);
 
     // Parse the file
     let parser = TxtParser::new();
-    let file = File::open(&file_path)
+    let file = File::open(&filePath)
         .map_err(|e| crate::AppError::Io(format!("Failed to open file: {}", e)))?;
     let chapters = parser.parse(file)?;
 
@@ -86,7 +90,7 @@ pub async fn import_novel(
         .sum();
 
     // Get file size
-    let file_metadata = std::fs::metadata(&file_path)
+    let file_metadata = std::fs::metadata(&filePath)
         .map_err(|e| crate::AppError::Io(format!("Failed to read file metadata: {}", e)))?;
     let file_size = file_metadata.len() as i64;
 
@@ -97,7 +101,7 @@ pub async fn import_novel(
         author.as_deref(),
         description.as_deref(),
         None, // cover_path
-        category_id,
+        categoryId,
         &format!("books/book-{}", 0), // Temporary, will be updated
         file_size,
         total_words,
@@ -158,9 +162,10 @@ pub async fn list_books(pool: State<'_, SqlitePool>) -> AppResult<Vec<NovelBook>
 #[tauri::command]
 pub async fn list_chapters(
     pool: State<'_, SqlitePool>,
-    book_id: i64,
+    #[allow(non_snake_case)]
+    bookId: i64,
 ) -> AppResult<Vec<NovelChapter>> {
-    database::list_chapters(&pool, book_id).await
+    database::list_chapters(&pool, bookId).await
 }
 
 /// Create a new category
@@ -168,10 +173,12 @@ pub async fn list_chapters(
 pub async fn create_category(
     pool: State<'_, SqlitePool>,
     name: String,
-    parent_id: Option<i64>,
-    sort_order: i32,
+    #[allow(non_snake_case)]
+    parentId: Option<i64>,
+    #[allow(non_snake_case)]
+    sortOrder: i32,
 ) -> AppResult<i64> {
-    database::insert_category(&pool, &name, parent_id, sort_order).await
+    database::insert_category(&pool, &name, parentId, sortOrder).await
 }
 
 /// List all categories
@@ -184,13 +191,15 @@ pub async fn list_categories(pool: State<'_, SqlitePool>) -> AppResult<Vec<Novel
 #[tauri::command]
 pub async fn get_chapter_content(
     pool: State<'_, SqlitePool>,
-    workspace_path: String,
-    chapter_id: i64,
+    #[allow(non_snake_case)]
+    workspacePath: String,
+    #[allow(non_snake_case)]
+    chapterId: i64,
 ) -> AppResult<String> {
-    let workspace = Path::new(&workspace_path);
+    let workspace = Path::new(&workspacePath);
 
     // Get chapter info from database
-    let chapter = database::get_chapter(&pool, chapter_id).await?
+    let chapter = database::get_chapter(&pool, chapterId).await?
         .ok_or_else(|| crate::AppError::Validation(format!("Chapter {} not found", chapter_id)))?;
 
     // Read content from file

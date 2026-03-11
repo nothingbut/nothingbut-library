@@ -69,6 +69,13 @@
       step = 'parsing';
       error = null;
 
+      console.log('Parsing file:', {
+        file: selectedFile,
+        title,
+        author: author || '未知作者',
+        category: category || '未分类'
+      });
+
       preview = await previewImport(
         selectedFile,
         title,
@@ -76,11 +83,17 @@
         category || '未分类'
       );
 
+      console.log('Parse successful:', preview);
       step = 'edit';
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to parse file';
+      console.error('Parse error details:', e);
+      // Try to get more detailed error message
+      if (e && typeof e === 'object' && 'message' in e) {
+        error = `解析失败: ${e.message}`;
+      } else {
+        error = `解析失败: ${String(e)}`;
+      }
       step = 'error';
-      console.error('Parse error:', e);
     } finally {
       parsing = false;
     }

@@ -24,7 +24,7 @@ export async function previewImport(
 	category: string
 ): Promise<ImportPreview> {
 	return await invoke('preview_import', {
-		file_path: filePath,
+		filePath,
 		title,
 		author,
 		category
@@ -43,12 +43,12 @@ export async function importNovel(
 	categoryId?: number
 ): Promise<number> {
 	return await invoke('import_novel', {
-		workspace_path: workspacePath,
-		file_path: filePath,
+		workspacePath,
+		filePath,
 		title,
 		author,
 		description,
-		category_id: categoryId
+		categoryId
 	});
 }
 
@@ -64,7 +64,7 @@ export async function listBooks(): Promise<Book[]> {
  */
 export async function listChapters(bookId: number): Promise<Chapter[]> {
 	return await invoke('list_chapters', {
-		book_id: bookId
+		bookId
 	});
 }
 
@@ -78,8 +78,8 @@ export async function createCategory(
 ): Promise<number> {
 	return await invoke('create_category', {
 		name,
-		parent_id: parentId,
-		sort_order: sortOrder
+		parentId,
+		sortOrder
 	});
 }
 
@@ -98,7 +98,7 @@ export async function getChapterContent(
 	chapterId: number
 ): Promise<string> {
 	return await invoke('get_chapter_content', {
-		workspace_path: workspacePath,
-		chapter_id: chapterId
+		workspacePath,
+		chapterId
 	});
 }
