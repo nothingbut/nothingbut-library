@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS novel_books (
     file_size INTEGER NOT NULL DEFAULT 0,
     word_count INTEGER NOT NULL DEFAULT 0,
     chapter_count INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'unread' CHECK(status IN ('unread', 'reading', 'completed')),
+    status TEXT NOT NULL DEFAULT 'ongoing' CHECK(status IN ('ongoing', 'completed', 'abandoned')),
     reading_progress REAL NOT NULL DEFAULT 0.0,
     last_read_at INTEGER,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),

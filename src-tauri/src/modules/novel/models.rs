@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 
 /// Novel book publication status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,41 +22,58 @@ impl std::fmt::Display for BookStatus {
     }
 }
 
+impl BookStatus {
+    /// Parse from database string
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "completed" => Some(BookStatus::Completed),
+            "ongoing" => Some(BookStatus::Ongoing),
+            "abandoned" => Some(BookStatus::Abandoned),
+            _ => None,
+        }
+    }
+}
+
 /// Novel category information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NovelCategory {
-    pub id: String,
+    pub id: i64,
     pub name: String,
-    pub description: Option<String>,
+    pub parent_id: Option<i64>,
+    pub sort_order: i32,
+    pub created_at: String,
 }
 
 /// Novel chapter information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NovelChapter {
-    pub id: String,
-    pub book_id: String,
-    pub chapter_number: u32,
+    pub id: i64,
+    pub book_id: i64,
     pub title: String,
-    pub content: String,
-    pub word_count: u32,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub file_path: String,
+    pub sort_order: i32,
+    pub word_count: i64,
+    pub created_at: String,
 }
 
 /// Novel book metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NovelBook {
-    pub id: String,
+    pub id: i64,
     pub title: String,
-    pub author: String,
+    pub author: Option<String>,
     pub description: Option<String>,
-    pub category_id: String,
+    pub cover_path: Option<String>,
+    pub category_id: Option<i64>,
+    pub book_dir: String,
+    pub file_size: i64,
+    pub word_count: i64,
+    pub chapter_count: i32,
     pub status: BookStatus,
-    pub cover_url: Option<String>,
-    pub total_chapters: u32,
-    pub word_count: u64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub reading_progress: f64,
+    pub last_read_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 /// Chapter preview for import operations
@@ -82,12 +98,12 @@ pub struct ImportPreview {
 /// Novel bookmark for readers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NovelBookmark {
-    pub id: String,
-    pub book_id: String,
-    pub chapter_id: String,
-    pub user_id: String,
+    pub id: i64,
+    pub book_id: i64,
+    pub chapter_id: Option<i64>,
+    pub position: i64,
     pub note: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: String,
 }
 
 #[cfg(test)]
@@ -116,11 +132,21 @@ mod tests {
     }
 
     #[test]
+    fn test_book_status_from_str() {
+        assert_eq!(BookStatus::from_str("completed"), Some(BookStatus::Completed));
+        assert_eq!(BookStatus::from_str("ongoing"), Some(BookStatus::Ongoing));
+        assert_eq!(BookStatus::from_str("abandoned"), Some(BookStatus::Abandoned));
+        assert_eq!(BookStatus::from_str("invalid"), None);
+    }
+
+    #[test]
     fn test_novel_category_serialization() {
         let category = NovelCategory {
-            id: "cat1".to_string(),
+            id: 1,
             name: "Fantasy".to_string(),
-            description: Some("Fantasy novels".to_string()),
+            parent_id: None,
+            sort_order: 0,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
         };
         let json = serde_json::to_string(&category).unwrap();
         assert!(json.contains("Fantasy"));
@@ -129,17 +155,21 @@ mod tests {
     #[test]
     fn test_novel_book_serialization() {
         let book = NovelBook {
-            id: "book1".to_string(),
+            id: 1,
             title: "The Great Novel".to_string(),
-            author: "Author Name".to_string(),
+            author: Some("Author Name".to_string()),
             description: Some("A great novel".to_string()),
-            category_id: "cat1".to_string(),
-            status: BookStatus::Completed,
-            cover_url: Some("https://example.com/cover.jpg".to_string()),
-            total_chapters: 100,
+            cover_path: Some("covers/book-1.jpg".to_string()),
+            category_id: Some(1),
+            book_dir: "books/book-1".to_string(),
+            file_size: 1024000,
             word_count: 500000,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            chapter_count: 100,
+            status: BookStatus::Completed,
+            reading_progress: 0.0,
+            last_read_at: None,
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-01T00:00:00Z".to_string(),
         };
         let json = serde_json::to_string(&book).unwrap();
         assert!(json.contains("The Great Novel"));
@@ -174,14 +204,14 @@ mod tests {
     #[test]
     fn test_novel_bookmark_serialization() {
         let bookmark = NovelBookmark {
-            id: "bm1".to_string(),
-            book_id: "book1".to_string(),
-            chapter_id: "ch1".to_string(),
-            user_id: "user1".to_string(),
+            id: 1,
+            book_id: 1,
+            chapter_id: Some(1),
+            position: 1000,
             note: Some("Great part!".to_string()),
-            created_at: Utc::now(),
+            created_at: "2024-01-01T00:00:00Z".to_string(),
         };
         let json = serde_json::to_string(&bookmark).unwrap();
-        assert!(json.contains("book1"));
+        assert!(json.contains("1000"));
     }
 }

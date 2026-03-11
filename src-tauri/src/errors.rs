@@ -25,6 +25,9 @@ pub enum AppError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     #[error("Module error: {0}")]
     Module(String),
 }
