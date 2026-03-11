@@ -9,14 +9,9 @@
 
   // Local state using Svelte 5 runes
   let showAIPanel = $state(false);
-  let currentView = $state('library');
 
   function toggleAIPanel() {
     showAIPanel = !showAIPanel;
-  }
-
-  function changeView(view: string) {
-    currentView = view;
   }
 </script>
 
@@ -24,49 +19,18 @@
   <!-- Toolbar -->
   <header class="toolbar">
     <div class="toolbar-left">
-      <button class="icon-button" aria-label="Menu">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M2 4H18M2 10H18M2 16H18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
+      <button class="toolbar-btn" onclick={() => {}}>
+        📚 资料库
       </button>
-      <span class="app-title">NothingBut Library</span>
     </div>
 
     <div class="toolbar-center">
-      <nav class="nav-tabs">
-        <button
-          class="nav-tab"
-          class:active={currentView === 'library'}
-          onclick={() => changeView('library')}
-        >
-          资料库
-        </button>
-        <button
-          class="nav-tab"
-          class:active={currentView === 'reader'}
-          onclick={() => changeView('reader')}
-        >
-          阅读器
-        </button>
-      </nav>
+      <h1 class="app-title">NothingBut Library</h1>
     </div>
 
     <div class="toolbar-right">
-      <button class="icon-button" aria-label="Search">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2"/>
-          <path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-      </button>
-      <button
-        class="icon-button ai-button"
-        class:active={showAIPanel}
-        onclick={toggleAIPanel}
-        aria-label="AI Assistant"
-      >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M10 2L12 8H18L13 12L15 18L10 14L5 18L7 12L2 8H8L10 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        </svg>
+      <button class="toolbar-btn" onclick={toggleAIPanel}>
+        {showAIPanel ? '🤖 关闭AI' : '🤖 打开AI'}
       </button>
     </div>
   </header>
@@ -82,11 +46,6 @@
       <aside class="ai-panel">
         <div class="ai-panel-header">
           <h2>AI 助手</h2>
-          <button class="icon-button" onclick={toggleAIPanel} aria-label="Close AI Panel">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 2L14 14M14 2L2 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </button>
         </div>
         <div class="ai-panel-content">
           <p class="placeholder-text">AI 助手面板占位</p>
@@ -118,18 +77,12 @@
 
   .toolbar-left,
   .toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 200px;
+    flex: 1;
   }
 
   .toolbar-left {
+    display: flex;
     justify-content: flex-start;
-  }
-
-  .toolbar-right {
-    justify-content: flex-end;
   }
 
   .toolbar-center {
@@ -138,62 +91,31 @@
     justify-content: center;
   }
 
+  .toolbar-right {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+  }
+
   .app-title {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--color-text-primary);
   }
 
-  /* Icon button styles */
-  .icon-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    color: var(--color-text-secondary);
-    transition: all 0.2s ease;
-  }
-
-  .icon-button:hover {
-    background-color: var(--color-bg-hover);
-    color: var(--color-text-primary);
-  }
-
-  .icon-button.active {
-    background-color: var(--color-primary);
-    color: white;
-  }
-
-  .ai-button.active {
-    background-color: var(--color-primary);
-    color: white;
-  }
-
-  /* Navigation tabs */
-  .nav-tabs {
-    display: flex;
-    gap: 8px;
-  }
-
-  .nav-tab {
-    padding: 6px 16px;
+  /* Toolbar button styles */
+  .toolbar-btn {
+    padding: 6px 12px;
     border-radius: 6px;
     font-size: 14px;
     font-weight: 500;
-    color: var(--color-text-secondary);
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-secondary);
     transition: all 0.2s ease;
   }
 
-  .nav-tab:hover {
+  .toolbar-btn:hover {
     background-color: var(--color-bg-hover);
-    color: var(--color-text-primary);
-  }
-
-  .nav-tab.active {
-    background-color: var(--color-bg-secondary);
-    color: var(--color-primary);
   }
 
   /* Main content area */
@@ -224,9 +146,6 @@
   }
 
   .ai-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     padding: 16px;
     border-bottom: 1px solid var(--color-border);
   }
@@ -248,21 +167,5 @@
     font-size: 13px;
     text-align: center;
     margin-top: 24px;
-  }
-
-  /* Responsive adjustments */
-  @media (max-width: 768px) {
-    .ai-panel {
-      width: 280px;
-    }
-
-    .toolbar-left,
-    .toolbar-right {
-      min-width: 100px;
-    }
-
-    .app-title {
-      display: none;
-    }
   }
 </style>
