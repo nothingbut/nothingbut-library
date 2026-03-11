@@ -13,13 +13,17 @@
   function toggleAIPanel() {
     showAIPanel = !showAIPanel;
   }
+
+  function goToHome() {
+    window.location.href = '/';
+  }
 </script>
 
 <div class="app-layout">
   <!-- Toolbar -->
   <header class="toolbar">
     <div class="toolbar-left">
-      <button class="toolbar-btn">
+      <button class="toolbar-btn" onclick={goToHome} title="返回首页">
         📚 资料库
       </button>
     </div>
@@ -112,10 +116,16 @@
     color: var(--color-text-primary);
     background-color: var(--color-bg-secondary);
     transition: all 0.2s ease;
+    cursor: pointer;
   }
 
   .toolbar-btn:hover {
     background-color: var(--color-bg-hover);
+    transform: translateY(-1px);
+  }
+
+  .toolbar-btn:active {
+    transform: translateY(0);
   }
 
   /* Main content area */
