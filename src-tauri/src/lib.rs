@@ -28,29 +28,60 @@ pub fn run() {
             let app_handle = app.handle();
             tauri::async_runtime::block_on(async move {
                 // Initialize SQLite connection pool
-                let db_path = app_handle
-                    .path()
-                    .app_data_dir()
-                    .expect("Failed to get app data dir")
-                    .join("library.db");
+                // In development mode, use local directory for easier access
+                #[cfg(debug_assertions)]
+                let db_path = {
+                    // Use project root directory (parent of src-tauri)
+                    let path = std::env::current_dir()
+                        .expect("Failed to get current directory")
+                        .parent()
+                        .expect("Failed to get parent directory")
+                        .join("library.db");
+                    println!("[DEV] Using database path: {:?}", path);
+                    path
+                };
+
+                #[cfg(not(debug_assertions))]
+                let db_path = {
+                    let path = app_handle
+                        .path()
+                        .app_data_dir()
+                        .expect("Failed to get app data dir")
+                        .join("library.db");
+                    println!("[PROD] Using database path: {:?}", path);
+                    path
+                };
 
                 // Ensure parent directory exists
                 if let Some(parent) = db_path.parent() {
+                    println!("Creating directory if needed: {:?}", parent);
                     std::fs::create_dir_all(parent)
-                        .expect("Failed to create app data directory");
+                        .map_err(|e| format!("Failed to create directory {:?}: {}", parent, e))
+                        .expect("Directory creation failed");
                 }
+
+                // Connect to database with create mode
+                let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
+                println!("Connecting to database: {}", db_url);
 
                 let pool = SqlitePoolOptions::new()
                     .max_connections(5)
-                    .connect(&format!("sqlite:{}", db_path.display()))
+                    .connect(&db_url)
                     .await
-                    .expect("Failed to connect to database");
+                    .map_err(|e| format!("Failed to connect to database at {:?}: {}", db_path, e))
+                    .expect("Database connection failed");
+
+                println!("Database connected successfully");
 
                 // Run migrations
+                println!("Running database migrations...");
                 sqlx::migrate!("./migrations")
                     .run(&pool)
                     .await
-                    .expect("Failed to run migrations");
+                    .map_err(|e| format!("Failed to run migrations: {}", e))
+                    .expect("Migration failed");
+
+                println!("Migrations completed successfully");
 
                 // Store pool in app state
                 app_handle.manage(pool);
