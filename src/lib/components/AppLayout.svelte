@@ -1,5 +1,6 @@
 <script lang="ts">
   import { type Snippet } from 'svelte';
+  import { page } from '$app/stores';
 
   interface Props {
     children: Snippet;
@@ -10,12 +11,23 @@
   // Local state using Svelte 5 runes
   let showAIPanel = $state(false);
 
+  // Derived states
+  let isHomePage = $derived($page.url.pathname === '/');
+  let currentLibraryName = $derived(() => {
+    const path = $page.url.pathname;
+    if (path === '/novel') return '网络小说';
+    if (path.startsWith('/novel')) return '网络小说';
+    return '';
+  });
+
   function toggleAIPanel() {
     showAIPanel = !showAIPanel;
   }
 
   function goToHome() {
-    window.location.href = '/';
+    if (!isHomePage) {
+      window.location.href = '/';
+    }
   }
 </script>
 
@@ -23,13 +35,21 @@
   <!-- Toolbar -->
   <header class="toolbar">
     <div class="toolbar-left">
-      <button class="toolbar-btn" onclick={goToHome} title="返回首页">
+      <button
+        class="toolbar-btn"
+        class:disabled={isHomePage}
+        onclick={goToHome}
+        title={isHomePage ? '当前在首页' : '返回首页'}
+        disabled={isHomePage}
+      >
         📚 资料库
       </button>
     </div>
 
     <div class="toolbar-center">
-      <h1 class="app-title">NothingBut Library</h1>
+      {#if currentLibraryName()}
+        <h1 class="app-title">{currentLibraryName()}</h1>
+      {/if}
     </div>
 
     <div class="toolbar-right">
@@ -126,6 +146,13 @@
 
   .toolbar-btn:active {
     transform: translateY(0);
+  }
+
+  .toolbar-btn:disabled,
+  .toolbar-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
   }
 
   /* Main content area */
