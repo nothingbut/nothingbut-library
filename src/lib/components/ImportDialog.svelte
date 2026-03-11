@@ -13,10 +13,11 @@
   let { isOpen = $bindable(false), onClose, onSuccess }: Props = $props();
 
   // State
-  let step = $state<'select' | 'preview' | 'importing' | 'success' | 'error'>('select');
+  let step = $state<'select' | 'parsing' | 'edit' | 'importing' | 'success' | 'error'>('select');
   let selectedFile = $state<string | null>(null);
   let preview = $state<ImportPreview | null>(null);
   let error = $state<string | null>(null);
+  let parsing = $state(false);
   let importing = $state(false);
 
   // Form data
@@ -28,7 +29,7 @@
   // Workspace path (hardcoded for now)
   const workspacePath = '/Users/shichang/Workspace/program/.worktrees/nothingbut-mvp/claude/nothingbut-library';
 
-  // Select file
+  // Select file and immediately parse
   async function selectFile() {
     try {
       const selected = await open({
@@ -44,6 +45,11 @@
         // Extract filename as default title
         const filename = selected.split('/').pop() || '';
         title = filename.replace('.txt', '');
+        author = '未知作者';
+        category = '未分类';
+
+        // Immediately parse the file
+        await parseFile();
       }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to select file';
@@ -51,15 +57,16 @@
     }
   }
 
-  // Preview import
-  async function handlePreview() {
+  // Parse file and show preview
+  async function parseFile() {
     if (!selectedFile || !title) {
-      error = 'Please select a file and enter a title';
+      error = 'Please select a file';
       return;
     }
 
     try {
-      importing = true;
+      parsing = true;
+      step = 'parsing';
       error = null;
 
       preview = await previewImport(
@@ -69,12 +76,13 @@
         category || '未分类'
       );
 
-      step = 'preview';
+      step = 'edit';
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to preview import';
-      console.error('Preview error:', e);
+      error = e instanceof Error ? e.message : 'Failed to parse file';
+      step = 'error';
+      console.error('Parse error:', e);
     } finally {
-      importing = false;
+      parsing = false;
     }
   }
 
@@ -129,8 +137,13 @@
   // Go back to file selection
   function handleBack() {
     step = 'select';
+    selectedFile = null;
     preview = null;
     error = null;
+    title = '';
+    author = '';
+    description = '';
+    category = '';
   }
 
   // Close dialog
@@ -168,8 +181,10 @@
         <h2 class="dialog-title">
           {#if step === 'select'}
             导入小说
-          {:else if step === 'preview'}
-            预览导入
+          {:else if step === 'parsing'}
+            解析文件中...
+          {:else if step === 'edit'}
+            确认导入信息
           {:else if step === 'importing'}
             导入中...
           {:else if step === 'success'}
@@ -186,92 +201,84 @@
         {#if step === 'select'}
           <!-- Step 1: File Selection -->
           <div class="form-section">
-            <div class="form-group">
-              <label class="form-label">选择文件</label>
-              <div class="file-input-group">
-                <input
-                  type="text"
-                  class="form-input"
-                  readonly
-                  value={selectedFile || ''}
-                  placeholder="请选择 .txt 文件"
-                />
-                <button class="btn btn-secondary" onclick={selectFile}>
-                  浏览...
-                </button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">书名 *</label>
-              <input
-                type="text"
-                class="form-input"
-                bind:value={title}
-                placeholder="请输入书名"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">作者</label>
-              <input
-                type="text"
-                class="form-input"
-                bind:value={author}
-                placeholder="作者姓名（可选）"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">分类</label>
-              <input
-                type="text"
-                class="form-input"
-                bind:value={category}
-                placeholder="例如：科幻、历史（可选）"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">简介</label>
-              <textarea
-                class="form-textarea"
-                bind:value={description}
-                placeholder="书籍简介（可选）"
-                rows="3"
-              ></textarea>
+            <div class="select-prompt">
+              <div class="select-icon">📂</div>
+              <p class="select-text">选择一个 .txt 格式的小说文件开始导入</p>
+              <button class="btn btn-primary btn-large" onclick={selectFile}>
+                选择文件
+              </button>
             </div>
 
             {#if error}
               <div class="error-message">{error}</div>
             {/if}
           </div>
-        {:else if step === 'preview' && preview}
-          <!-- Step 2: Preview -->
-          <div class="preview-section">
-            <div class="preview-info">
-              <div class="preview-row">
-                <span class="preview-label">书名：</span>
-                <span class="preview-value">{preview.title}</span>
+        {:else if step === 'parsing'}
+          <!-- Step 2: Parsing -->
+          <div class="status-section">
+            <div class="spinner"></div>
+            <p class="status-text">正在解析文件...</p>
+            <p class="status-subtext">提取章节信息和元数据</p>
+          </div>
+        {:else if step === 'edit' && preview}
+          <!-- Step 3: Edit Metadata & Preview -->
+          <div class="edit-section">
+            <!-- Statistics Summary -->
+            <div class="stats-summary">
+              <div class="stat-item">
+                <span class="stat-label">总章节</span>
+                <span class="stat-value">{formatNumber(preview.total_chapters)}</span>
               </div>
-              <div class="preview-row">
-                <span class="preview-label">作者：</span>
-                <span class="preview-value">{preview.author}</span>
-              </div>
-              <div class="preview-row">
-                <span class="preview-label">分类：</span>
-                <span class="preview-value">{preview.category}</span>
-              </div>
-              <div class="preview-row">
-                <span class="preview-label">总章节：</span>
-                <span class="preview-value">{formatNumber(preview.total_chapters)} 章</span>
-              </div>
-              <div class="preview-row">
-                <span class="preview-label">总字数：</span>
-                <span class="preview-value">{formatNumber(preview.total_words)} 字</span>
+              <div class="stat-item">
+                <span class="stat-label">总字数</span>
+                <span class="stat-value">{formatNumber(preview.total_words)}</span>
               </div>
             </div>
 
+            <!-- Metadata Form -->
+            <div class="form-section">
+              <div class="form-group">
+                <label class="form-label">书名 *</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  bind:value={title}
+                  placeholder="请输入书名"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">作者</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  bind:value={author}
+                  placeholder="作者姓名"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">分类</label>
+                <input
+                  type="text"
+                  class="form-input"
+                  bind:value={category}
+                  placeholder="例如：科幻、历史"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">简介</label>
+                <textarea
+                  class="form-textarea"
+                  bind:value={description}
+                  placeholder="书籍简介（可选）"
+                  rows="3"
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Chapter Preview -->
             <div class="preview-chapters">
               <h4 class="preview-chapters-title">章节预览（前 {preview.chapters.length} 章）</h4>
               <div class="chapter-preview-list">
@@ -319,25 +326,18 @@
       <div class="dialog-footer">
         {#if step === 'select'}
           <button class="btn btn-secondary" onclick={handleClose}>取消</button>
-          <button
-            class="btn btn-primary"
-            onclick={handlePreview}
-            disabled={!selectedFile || !title || importing}
-          >
-            {importing ? '处理中...' : '下一步'}
-          </button>
-        {:else if step === 'preview'}
-          <button class="btn btn-secondary" onclick={handleBack}>上一步</button>
+        {:else if step === 'edit'}
+          <button class="btn btn-secondary" onclick={handleBack}>重新选择</button>
           <button
             class="btn btn-primary"
             onclick={handleImport}
-            disabled={importing}
+            disabled={!title || importing}
           >
-            确认导入
+            {importing ? '导入中...' : '确认导入'}
           </button>
         {:else if step === 'error'}
           <button class="btn btn-secondary" onclick={handleClose}>关闭</button>
-          <button class="btn btn-primary" onclick={handleBack}>重试</button>
+          <button class="btn btn-primary" onclick={handleBack}>重新选择</button>
         {/if}
       </div>
     </div>
@@ -417,6 +417,33 @@
     border-top: 1px solid var(--color-border);
   }
 
+  /* Select Prompt */
+  .select-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 24px;
+    text-align: center;
+  }
+
+  .select-icon {
+    font-size: 72px;
+    margin-bottom: 24px;
+  }
+
+  .select-text {
+    font-size: 16px;
+    color: var(--color-text-secondary);
+    margin: 0 0 32px 0;
+    max-width: 400px;
+  }
+
+  .btn-large {
+    padding: 14px 32px;
+    font-size: 16px;
+  }
+
   /* Form Styles */
   .form-section {
     display: flex;
@@ -463,45 +490,41 @@
     font-family: inherit;
   }
 
-  .file-input-group {
-    display: flex;
-    gap: 8px;
-  }
-
-  .file-input-group .form-input {
-    flex: 1;
-  }
-
-  /* Preview Styles */
-  .preview-section {
+  /* Edit Section */
+  .edit-section {
     display: flex;
     flex-direction: column;
     gap: 24px;
   }
 
-  .preview-info {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  .stats-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
     padding: 16px;
     border-radius: 8px;
     background-color: var(--color-bg-secondary);
   }
 
-  .preview-row {
+  .stat-item {
     display: flex;
-    gap: 12px;
-    font-size: 14px;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
   }
 
-  .preview-label {
+  .stat-label {
+    font-size: 12px;
     font-weight: 500;
     color: var(--color-text-secondary);
-    min-width: 70px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
-  .preview-value {
-    color: var(--color-text-primary);
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-primary);
   }
 
   .preview-chapters-title {
