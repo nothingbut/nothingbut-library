@@ -142,6 +142,38 @@ pub async fn insert_chapter(
     Ok(result.last_insert_rowid())
 }
 
+/// Get a single chapter by ID
+pub async fn get_chapter(pool: &SqlitePool, chapter_id: i64) -> AppResult<Option<NovelChapter>> {
+    let row = sqlx::query(
+        r#"
+        SELECT id, book_id, title, file_path, sort_order, word_count, created_at
+        FROM novel_chapters
+        WHERE id = ?
+        "#,
+    )
+    .bind(chapter_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| AppError::Database(format!("Failed to get chapter: {}", e)))?;
+
+    Ok(row.map(|row| {
+        let created_timestamp: i64 = row.get("created_at");
+        let created_at = chrono::DateTime::from_timestamp(created_timestamp, 0)
+            .unwrap()
+            .to_rfc3339();
+
+        NovelChapter {
+            id: row.get("id"),
+            book_id: row.get("book_id"),
+            title: row.get("title"),
+            file_path: row.get("file_path"),
+            sort_order: row.get("sort_order"),
+            word_count: row.get("word_count"),
+            created_at,
+        }
+    }))
+}
+
 /// List chapters by book_id
 pub async fn list_chapters(pool: &SqlitePool, book_id: i64) -> AppResult<Vec<NovelChapter>> {
     let rows = sqlx::query(

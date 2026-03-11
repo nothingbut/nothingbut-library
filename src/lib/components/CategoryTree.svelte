@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { listCategories, listBooks } from '$lib/services/api';
+  import type { Category, Book, BookStatus } from '$lib/types';
 
   // Props
   interface Props {
@@ -12,155 +14,111 @@
   interface TreeNode {
     id: string | number;
     name: string;
-    type: 'root' | 'category-1' | 'category-2' | 'book';
+    type: 'root' | 'category' | 'book';
     parentId: string | number | null;
     children: TreeNode[];
     expanded: boolean;
     // Book-specific fields
     bookId?: number;
-    status?: 'completed' | 'ongoing' | 'abandoned';
+    status?: BookStatus;
+    // Category-specific fields
+    categoryId?: number;
   }
 
   // State
   let tree = $state<TreeNode[]>([]);
   let selectedId = $state<string | number | null>(null);
+  let loading = $state(true);
+  let error = $state<string | null>(null);
 
-  // Build mock tree data
-  function loadMockTree() {
-    const mockData: TreeNode[] = [
-      {
+  // Build tree from API data
+  async function loadTree() {
+    try {
+      loading = true;
+      error = null;
+
+      // Load data from API
+      const [categories, books] = await Promise.all([
+        listCategories(),
+        listBooks()
+      ]);
+
+      // Build category map for easy lookup
+      const categoryMap = new Map<number, TreeNode>();
+      const rootNode: TreeNode = {
         id: 'root',
         name: '📚 全部小说',
         type: 'root',
         parentId: null,
         children: [],
         expanded: true,
-      },
-    ];
+      };
 
-    // L2: First-level categories
-    const cat1: TreeNode = {
-      id: 'cat-scifi',
-      name: '📁 科幻',
-      type: 'category-1',
-      parentId: 'root',
-      children: [],
-      expanded: false,
-    };
+      // Create category nodes
+      categories.forEach(cat => {
+        const node: TreeNode = {
+          id: `cat-${cat.id}`,
+          categoryId: cat.id,
+          name: `📁 ${cat.name}`,
+          type: 'category',
+          parentId: cat.parent_id ? `cat-${cat.parent_id}` : 'root',
+          children: [],
+          expanded: false,
+        };
+        categoryMap.set(cat.id, node);
+      });
 
-    const cat2: TreeNode = {
-      id: 'cat-history',
-      name: '📁 历史',
-      type: 'category-1',
-      parentId: 'root',
-      children: [],
-      expanded: false,
-    };
+      // Build category tree hierarchy
+      categoryMap.forEach(node => {
+        if (node.parentId === 'root') {
+          rootNode.children.push(node);
+        } else {
+          const parentCatId = typeof node.parentId === 'string'
+            ? parseInt(node.parentId.replace('cat-', ''))
+            : null;
+          if (parentCatId !== null) {
+            const parent = categoryMap.get(parentCatId);
+            if (parent) {
+              parent.children.push(node);
+            }
+          }
+        }
+      });
 
-    const cat3: TreeNode = {
-      id: 'cat-fantasy',
-      name: '📁 玄幻',
-      type: 'category-1',
-      parentId: 'root',
-      children: [],
-      expanded: false,
-    };
+      // Add books to their categories
+      books.forEach(book => {
+        const bookNode: TreeNode = {
+          id: `book-${book.id}`,
+          bookId: book.id,
+          name: book.title,
+          type: 'book',
+          status: book.status,
+          parentId: book.category_id ? `cat-${book.category_id}` : 'root',
+          children: [],
+          expanded: false,
+        };
 
-    // L3: Second-level categories (sub-categories)
-    const subcat1: TreeNode = {
-      id: 'subcat-space',
-      name: '📂 太空歌剧',
-      type: 'category-2',
-      parentId: 'cat-scifi',
-      children: [],
-      expanded: false,
-    };
+        if (book.category_id) {
+          const parent = categoryMap.get(book.category_id);
+          if (parent) {
+            parent.children.push(bookNode);
+          } else {
+            // If category not found, add to root
+            rootNode.children.push(bookNode);
+          }
+        } else {
+          // No category, add to root
+          rootNode.children.push(bookNode);
+        }
+      });
 
-    const subcat2: TreeNode = {
-      id: 'subcat-apocalypse',
-      name: '📂 末世幻想',
-      type: 'category-2',
-      parentId: 'cat-scifi',
-      children: [],
-      expanded: false,
-    };
-
-    const subcat3: TreeNode = {
-      id: 'subcat-ancient',
-      name: '📂 古代',
-      type: 'category-2',
-      parentId: 'cat-history',
-      children: [],
-      expanded: false,
-    };
-
-    // L4: Books
-    const book1: TreeNode = {
-      id: 'book-1',
-      bookId: 1,
-      name: '三体',
-      type: 'book',
-      status: 'completed',
-      parentId: 'subcat-space',
-      children: [],
-      expanded: false,
-    };
-
-    const book2: TreeNode = {
-      id: 'book-2',
-      bookId: 2,
-      name: '流浪地球',
-      type: 'book',
-      status: 'completed',
-      parentId: 'subcat-space',
-      children: [],
-      expanded: false,
-    };
-
-    const book3: TreeNode = {
-      id: 'book-3',
-      bookId: 3,
-      name: '全球高武',
-      type: 'book',
-      status: 'ongoing',
-      parentId: 'subcat-apocalypse',
-      children: [],
-      expanded: false,
-    };
-
-    const book4: TreeNode = {
-      id: 'book-4',
-      bookId: 4,
-      name: '明朝那些事儿',
-      type: 'book',
-      status: 'completed',
-      parentId: 'subcat-ancient',
-      children: [],
-      expanded: false,
-    };
-
-    const book5: TreeNode = {
-      id: 'book-5',
-      bookId: 5,
-      name: '某未完成小说',
-      type: 'book',
-      status: 'abandoned',
-      parentId: 'subcat-ancient',
-      children: [],
-      expanded: false,
-    };
-
-    // Build tree structure
-    subcat1.children.push(book1, book2);
-    subcat2.children.push(book3);
-    subcat3.children.push(book4, book5);
-
-    cat1.children.push(subcat1, subcat2);
-    cat2.children.push(subcat3);
-
-    mockData[0].children.push(cat1, cat2, cat3);
-
-    tree = mockData;
+      tree = [rootNode];
+      loading = false;
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to load data';
+      loading = false;
+      console.error('Failed to load tree data:', e);
+    }
   }
 
   // Toggle expand/collapse
@@ -202,7 +160,7 @@
   }
 
   onMount(() => {
-    loadMockTree();
+    loadTree();
   });
 </script>
 
@@ -249,9 +207,17 @@
 {/snippet}
 
 <div class="category-tree">
-  {#each tree as root (root.id)}
-    {@render renderNode(root, 0)}
-  {/each}
+  {#if loading}
+    <div class="tree-status">Loading...</div>
+  {:else if error}
+    <div class="tree-error">{error}</div>
+  {:else if tree.length === 0}
+    <div class="tree-empty">No data available</div>
+  {:else}
+    {#each tree as root (root.id)}
+      {@render renderNode(root, 0)}
+    {/each}
+  {/if}
 </div>
 
 <style>
@@ -364,5 +330,19 @@
 
   .category-tree::-webkit-scrollbar-thumb:hover {
     background: var(--color-text-secondary);
+  }
+
+  /* Status messages */
+  .tree-status,
+  .tree-error,
+  .tree-empty {
+    padding: 16px;
+    text-align: center;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+  }
+
+  .tree-error {
+    color: red;
   }
 </style>

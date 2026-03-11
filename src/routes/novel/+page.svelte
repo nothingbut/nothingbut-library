@@ -1,105 +1,73 @@
 <script lang="ts">
   import CategoryTree from '$lib/components/CategoryTree.svelte';
-  import { onMount } from 'svelte';
-
-  // Types
-  interface Book {
-    id: number;
-    title: string;
-    author: string;
-    description: string;
-    coverPath?: string;
-    category: string;
-    status: 'completed' | 'ongoing' | 'abandoned';
-    wordCount: number;
-    chapterCount: number;
-  }
-
-  interface Chapter {
-    id: number;
-    order: number;
-    title: string;
-    lineCount: number;
-    firstLine: string;
-    content?: string;
-  }
+  import { listBooks, listChapters, getChapterContent } from '$lib/services/api';
+  import type { Book, Chapter, BookStatus } from '$lib/types';
 
   // State
   let selectedBook = $state<Book | null>(null);
-  let selectedChapter = $state<Chapter | null>(null);
+  let selectedChapter = $state<Chapter & { content?: string } | null>(null);
   let chapters = $state<Chapter[]>([]);
+  let loading = $state(false);
+  let error = $state<string | null>(null);
 
-  // Mock data
-  const mockBook: Book = {
-    id: 1,
-    title: '三体',
-    author: '刘慈欣',
-    description:
-      '文化大革命如火如荼地进行，天文学家叶文洁在期间历经劫难，被带到军方绝秘计划"红岸工程"。叶文洁以太阳为天线，向宇宙发出地球文明的第一声啼鸣，取得了探寻外星文明的突破性进展。',
-    category: '科幻 / 太空歌剧',
-    status: 'completed',
-    wordCount: 280000,
-    chapterCount: 46,
-  };
-
-  const mockChapters: Chapter[] = [
-    {
-      id: 1,
-      order: 1,
-      title: '第一章 疯狂年代',
-      lineCount: 125,
-      firstLine: '那是一个疯狂的年代，红色的旗帜飘扬在每一个角落...',
-    },
-    {
-      id: 2,
-      order: 2,
-      title: '第二章 寂静的春天',
-      lineCount: 98,
-      firstLine: '清晨的阳光透过树叶的缝隙，洒在林间小道上...',
-    },
-    {
-      id: 3,
-      order: 3,
-      title: '第三章 红岸之一',
-      lineCount: 156,
-      firstLine: '红岸基地位于大兴安岭深处，这里人迹罕至...',
-    },
-    {
-      id: 4,
-      order: 4,
-      title: '第四章 三体世界',
-      lineCount: 142,
-      firstLine: '三体文明处于一个拥有三颗太阳的星系之中...',
-    },
-    {
-      id: 5,
-      order: 5,
-      title: '第五章 叶文洁',
-      lineCount: 188,
-      firstLine: '叶文洁站在雷达峰的顶端，凝视着远方的天空...',
-    },
-  ];
+  // Workspace path (hardcoded for now, should come from config)
+  const workspacePath = '/Users/shichang/Workspace/program/.worktrees/nothingbut-mvp/claude/nothingbut-library';
 
   // Handlers
-  function handleBookSelect(bookId: number) {
-    // TODO: Load from backend
-    selectedBook = mockBook;
-    chapters = mockChapters;
-    selectedChapter = null;
-  }
+  async function handleBookSelect(bookId: number) {
+    try {
+      loading = true;
+      error = null;
 
-  function handleChapterSelect(chapterId: number) {
-    const chapter = chapters.find((ch) => ch.id === chapterId);
-    if (chapter) {
-      // Load chapter content (mock)
-      selectedChapter = {
-        ...chapter,
-        content: `# ${chapter.title}\n\n${'这是章节内容的占位文本。'.repeat(50)}`,
-      };
+      // Load book and chapters from backend
+      const [books, chapterList] = await Promise.all([
+        listBooks(),
+        listChapters(bookId)
+      ]);
+
+      const book = books.find(b => b.id === bookId);
+      if (book) {
+        selectedBook = book;
+        chapters = chapterList;
+        selectedChapter = null;
+      } else {
+        error = 'Book not found';
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to load book';
+      console.error('Failed to load book:', e);
+    } finally {
+      loading = false;
     }
   }
 
-  function getStatusLabel(status: Book['status']): string {
+  async function handleChapterSelect(chapterId: number) {
+    try {
+      loading = true;
+      error = null;
+
+      const chapter = chapters.find((ch) => ch.id === chapterId);
+      if (!chapter) {
+        error = 'Chapter not found';
+        return;
+      }
+
+      // Load chapter content from file
+      const content = await getChapterContent(workspacePath, chapterId);
+
+      selectedChapter = {
+        ...chapter,
+        content
+      };
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to load chapter';
+      console.error('Failed to load chapter:', e);
+    } finally {
+      loading = false;
+    }
+  }
+
+  function getStatusLabel(status: BookStatus): string {
     const labels = {
       completed: '✓ 已完本',
       ongoing: '⏳ 连载中',
@@ -108,7 +76,7 @@
     return labels[status];
   }
 
-  function getStatusColor(status: Book['status']): string {
+  function getStatusColor(status: BookStatus): string {
     const colors = {
       completed: 'green',
       ongoing: 'orange',
@@ -117,16 +85,21 @@
     return colors[status];
   }
 
-  function truncateText(text: string, maxLength: number = 20): string {
-    if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength) + '...';
+  function getCategoryName(book: Book): string {
+    // TODO: Resolve category name from category_id
+    return book.category_id ? `分类 ${book.category_id}` : '未分类';
   }
 
-  // Simulate book selection on mount for demo
-  onMount(() => {
-    // Uncomment to auto-select a book for testing
-    // setTimeout(() => handleBookSelect(1), 500);
-  });
+  function getLineCount(chapter: Chapter): number {
+    // Estimate line count from word count
+    return Math.ceil(chapter.word_count / 15);
+  }
+
+  function getFirstLine(content: string): string {
+    const lines = content.split('\n').filter(line => line.trim());
+    return lines[0] || '';
+  }
+
 </script>
 
 <div class="novel-module">
@@ -156,9 +129,9 @@
           <!-- State 2: Book metadata -->
           <div class="book-metadata">
             <div class="metadata-card">
-              {#if selectedBook.coverPath}
+              {#if selectedBook.cover_path}
                 <img
-                  src={selectedBook.coverPath}
+                  src={selectedBook.cover_path}
                   alt={selectedBook.title}
                   class="book-cover"
                 />
@@ -173,12 +146,12 @@
 
                 <div class="metadata-row">
                   <span class="label">作者：</span>
-                  <span class="value">{selectedBook.author}</span>
+                  <span class="value">{selectedBook.author || '未知'}</span>
                 </div>
 
                 <div class="metadata-row">
                   <span class="label">分类：</span>
-                  <span class="value">{selectedBook.category}</span>
+                  <span class="value">{getCategoryName(selectedBook)}</span>
                 </div>
 
                 <div class="metadata-row">
@@ -194,18 +167,18 @@
                 <div class="metadata-row">
                   <span class="label">字数：</span>
                   <span class="value"
-                    >{(selectedBook.wordCount / 10000).toFixed(1)} 万字</span
+                    >{(selectedBook.word_count / 10000).toFixed(1)} 万字</span
                   >
                 </div>
 
                 <div class="metadata-row">
                   <span class="label">章节：</span>
-                  <span class="value">{selectedBook.chapterCount} 章</span>
+                  <span class="value">{selectedBook.chapter_count} 章</span>
                 </div>
 
                 <div class="description">
                   <p class="label">简介：</p>
-                  <p class="description-text">{selectedBook.description}</p>
+                  <p class="description-text">{selectedBook.description || '暂无简介'}</p>
                 </div>
               </div>
             </div>
@@ -236,22 +209,25 @@
         <div class="chapter-list">
           <h3 class="chapter-list-title">章节目录</h3>
           <div class="chapter-items">
-            {#each chapters as chapter (chapter.id)}
-              <button
-                class="chapter-item"
-                class:active={selectedChapter?.id === chapter.id}
-                onclick={() => handleChapterSelect(chapter.id)}
-              >
-                <div class="chapter-item-header">
-                  <span class="chapter-order">{chapter.order}.</span>
-                  <span class="chapter-item-title">{chapter.title}</span>
-                  <span class="chapter-length">[{chapter.lineCount}行]</span>
-                </div>
-                <div class="chapter-preview">
-                  {truncateText(chapter.firstLine, 40)}
-                </div>
-              </button>
-            {/each}
+            {#if loading}
+              <div class="chapter-loading">Loading...</div>
+            {:else if chapters.length === 0}
+              <div class="chapter-empty">暂无章节</div>
+            {:else}
+              {#each chapters as chapter (chapter.id)}
+                <button
+                  class="chapter-item"
+                  class:active={selectedChapter?.id === chapter.id}
+                  onclick={() => handleChapterSelect(chapter.id)}
+                >
+                  <div class="chapter-item-header">
+                    <span class="chapter-order">{chapter.sort_order}.</span>
+                    <span class="chapter-item-title">{chapter.title}</span>
+                    <span class="chapter-length">[{chapter.word_count}字]</span>
+                  </div>
+                </button>
+              {/each}
+            {/if}
           </div>
         </div>
       </div>
@@ -584,13 +560,12 @@
     color: rgba(255, 255, 255, 0.8);
   }
 
-  .chapter-preview {
-    font-size: 12px;
+  /* Chapter list states */
+  .chapter-loading,
+  .chapter-empty {
+    padding: 24px;
+    text-align: center;
+    font-size: 14px;
     color: var(--color-text-secondary);
-    line-height: 1.5;
-  }
-
-  .chapter-item.active .chapter-preview {
-    color: rgba(255, 255, 255, 0.7);
   }
 </style>

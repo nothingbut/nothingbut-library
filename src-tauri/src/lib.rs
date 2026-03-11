@@ -94,6 +94,7 @@ pub fn run() {
             modules::novel::commands::import_novel,
             modules::novel::commands::list_books,
             modules::novel::commands::list_chapters,
+            modules::novel::commands::get_chapter_content,
             modules::novel::commands::create_category,
             modules::novel::commands::list_categories,
         ])

@@ -179,3 +179,24 @@ pub async fn create_category(
 pub async fn list_categories(pool: State<'_, SqlitePool>) -> AppResult<Vec<NovelCategory>> {
     database::list_categories(&pool).await
 }
+
+/// Get chapter content by reading from file
+#[tauri::command]
+pub async fn get_chapter_content(
+    pool: State<'_, SqlitePool>,
+    workspace_path: String,
+    chapter_id: i64,
+) -> AppResult<String> {
+    let workspace = Path::new(&workspace_path);
+
+    // Get chapter info from database
+    let chapter = database::get_chapter(&pool, chapter_id).await?
+        .ok_or_else(|| crate::AppError::Validation(format!("Chapter {} not found", chapter_id)))?;
+
+    // Read content from file
+    let file_path = workspace.join(&chapter.file_path);
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| crate::AppError::Io(format!("Failed to read chapter file: {}", e)))?;
+
+    Ok(content)
+}

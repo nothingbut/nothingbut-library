@@ -1,9 +1,11 @@
+export type BookStatus = 'completed' | 'ongoing' | 'abandoned';
+
 export interface Category {
-	id: string;
+	id: number;
 	name: string;
-	parentId: string | null;
-	sortOrder: number;
-	createdAt: Date;
+	parent_id: number | null;
+	sort_order: number;
+	created_at: string;
 }
 
 export interface CategoryNode extends Category {
@@ -12,22 +14,29 @@ export interface CategoryNode extends Category {
 }
 
 export interface Book {
-	id: string;
+	id: number;
 	title: string;
-	author: string;
-	description: string;
-	coverUrl: string;
-	categoryId: string;
-	createdAt: Date;
-	updatedAt: Date;
+	author: string | null;
+	description: string | null;
+	cover_path: string | null;
+	category_id: number | null;
+	book_dir: string;
+	file_size: number;
+	word_count: number;
+	chapter_count: number;
+	status: BookStatus;
+	reading_progress: number;
+	last_read_at: string | null;
+	created_at: string;
+	updated_at: string;
 }
 
 export interface Chapter {
-	id: string;
-	bookId: string;
+	id: number;
+	book_id: number;
 	title: string;
-	content: string;
-	sortOrder: number;
-	createdAt: Date;
-	updatedAt: Date;
+	file_path: string;
+	sort_order: number;
+	word_count: number;
+	created_at: string;
 }

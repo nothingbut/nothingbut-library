@@ -30,7 +30,7 @@ export function updateBook(book: Book) {
 	books.update((list) => list.map((b) => (b.id === book.id ? book : b)));
 }
 
-export function removeBook(bookId: string) {
+export function removeBook(bookId: number) {
 	books.update((list) => list.filter((b) => b.id !== bookId));
 }
 
@@ -42,6 +42,6 @@ export function updateCategory(category: Category) {
 	categories.update((list) => list.map((c) => (c.id === category.id ? category : c)));
 }
 
-export function removeCategory(categoryId: string) {
+export function removeCategory(categoryId: number) {
 	categories.update((list) => list.filter((c) => c.id !== categoryId));
 }

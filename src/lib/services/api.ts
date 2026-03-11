@@ -89,3 +89,16 @@ export async function createCategory(
 export async function listCategories(): Promise<Category[]> {
 	return await invoke('list_categories');
 }
+
+/**
+ * Get chapter content
+ */
+export async function getChapterContent(
+	workspacePath: string,
+	chapterId: number
+): Promise<string> {
+	return await invoke('get_chapter_content', {
+		workspace_path: workspacePath,
+		chapter_id: chapterId
+	});
+}
