@@ -37,11 +37,7 @@
 
   <!-- Main content area -->
   <main class="main-content" class:with-ai-panel={showAIPanel}>
-    <div class="content-area">
-      {@render children()}
-    </div>
-
-    <!-- AI Panel (toggleable) -->
+    <!-- AI Panel (toggleable) - 左侧 -->
     {#if showAIPanel}
       <aside class="ai-panel">
         <div class="ai-panel-header">
@@ -52,6 +48,10 @@
         </div>
       </aside>
     {/if}
+
+    <div class="content-area">
+      {@render children()}
+    </div>
   </main>
 </div>
 
@@ -135,7 +135,7 @@
   .ai-panel {
     width: 320px;
     background-color: var(--color-bg-primary);
-    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
     flex-shrink: 0;

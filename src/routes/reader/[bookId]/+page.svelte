@@ -25,11 +25,12 @@
 
 	function loadBook() {
 		// TODO: Replace with API call to fetch book details from backend
+		const id = bookId || '1';
 		book = {
-			id: bookId,
+			id: id,
 			title: 'The Great Adventure',
 			author: 'John Smith',
-			directory: `/books/${bookId}`
+			directory: `/books/${id}`
 		};
 	}
 
