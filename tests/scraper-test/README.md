@@ -55,6 +55,32 @@ cargo run --bin test_headless_chrome
 
 ---
 
+### 方案4：Chromiumoxide Stealth模式 ⭐ 新方案
+
+使用更现代的chromiumoxide库，内置stealth模式隐藏自动化特征。
+
+```bash
+cd tests/scraper-test
+cargo run --bin test_chromiumoxide_stealth
+```
+
+**Stealth模式特性**：
+- 移除`navigator.webdriver`属性
+- 修改permissions API
+- 隐藏自动化指标
+- 自定义User-Agent
+
+**灵感来源**：
+- JavaScript生态的puppeteer-extra-plugin-stealth（17种规避技术）
+- Chromiumoxide是Rust的现代化Chrome自动化库
+
+**预期结果**：
+- 验证stealth模式是否能绕过起点WAF
+- 保存截图用于调试
+- 提取书籍信息
+
+---
+
 ## 快速运行所有测试
 
 ```bash
