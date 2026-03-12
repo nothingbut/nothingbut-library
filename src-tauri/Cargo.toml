@@ -35,6 +35,7 @@ reqwest = { version = "0.11", features = ["json", "cookies"] }
 scraper = "0.20"
 image = "0.25"
 urlencoding = "2.1"
+headless_chrome = "1.0"
 
 [dev-dependencies]
 tempfile = "3.8"
