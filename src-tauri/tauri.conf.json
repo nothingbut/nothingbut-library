@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "NothingBut Library",
+  "version": "0.1.0",
+  "identifier": "com.nothingbut.library",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bun run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../build"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      }
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "NothingBut Library",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 768
+      }
+    ]
+  }
+}
