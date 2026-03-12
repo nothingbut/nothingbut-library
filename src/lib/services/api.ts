@@ -41,7 +41,8 @@ export async function importNovel(
 	title: string,
 	author?: string,
 	description?: string,
-	categoryId?: number
+	categoryId?: number,
+	sourceSite?: string
 ): Promise<number> {
 	return await invoke('import_novel', {
 		workspacePath,
@@ -49,7 +50,8 @@ export async function importNovel(
 		title,
 		author,
 		description,
-		categoryId
+		categoryId,
+		sourceSite
 	});
 }
 
@@ -101,5 +103,43 @@ export async function getChapterContent(
 	return await invoke('get_chapter_content', {
 		workspacePath,
 		chapterId
+	});
+}
+
+/**
+ * Fetch book metadata from source website
+ */
+export async function fetchBookMetadata(
+	workspacePath: string,
+	bookId: number | null,
+	sourceSite: string,
+	title: string,
+	author?: string
+): Promise<{
+	description?: string;
+	author?: string;
+	category?: string;
+	coverPath?: string;
+	coverUrl?: string;
+}> {
+	return await invoke('fetch_book_metadata', {
+		workspacePath,
+		bookId,
+		sourceSite,
+		title,
+		author
+	});
+}
+
+/**
+ * Delete a book
+ */
+export async function deleteBook(
+	workspacePath: string,
+	bookId: number
+): Promise<void> {
+	return await invoke('delete_book', {
+		workspacePath,
+		bookId
 	});
 }

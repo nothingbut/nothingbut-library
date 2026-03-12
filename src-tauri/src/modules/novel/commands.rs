@@ -6,6 +6,7 @@ use crate::errors::AppResult;
 use super::database;
 use super::models::{BookStatus, ChapterPreview, ImportPreview, NovelBook, NovelCategory, NovelChapter};
 use super::parser::TxtParser;
+use super::scraper;
 use super::storage::{count_words, create_book_dir, save_chapter, save_metadata, BookMetadata};
 
 /// Preview import - show first 3 chapters with auto-extracted metadata
@@ -74,6 +75,8 @@ pub async fn import_novel(
     description: Option<String>,
     #[allow(non_snake_case)]
     categoryId: Option<i64>,
+    #[allow(non_snake_case)]
+    sourceSite: Option<String>,
 ) -> AppResult<i64> {
     let workspace = Path::new(&workspacePath);
 
@@ -109,6 +112,7 @@ pub async fn import_novel(
         description.as_deref(),
         None, // cover_path
         categoryId,
+        sourceSite.as_deref(),
         &format!("books/book-{}", 0), // Temporary, will be updated
         file_size,
         total_words,
@@ -134,12 +138,15 @@ pub async fn import_novel(
         let file_path = save_chapter(&book_dir, idx + 1, chapter)?;
         let word_count = count_words(&chapter.content) as i64;
 
+        // Store full relative path from workspace (books/book-{id}/chapters/...)
+        let full_file_path = format!("{}/{}", book_dir_path, file_path);
+
         database::insert_chapter(
             &pool,
             book_id,
             &chapter.title,
             &chapter.preview,
-            &file_path,
+            &full_file_path,
             (idx + 1) as i32,
             word_count,
         )
@@ -204,17 +211,28 @@ pub async fn get_chapter_content(
     #[allow(non_snake_case)]
     chapterId: i64,
 ) -> AppResult<String> {
+    println!("[get_chapter_content] workspace: {}, chapterId: {}", workspacePath, chapterId);
+
     let workspace = Path::new(&workspacePath);
 
     // Get chapter info from database
     let chapter = database::get_chapter(&pool, chapterId).await?
         .ok_or_else(|| crate::AppError::Validation(format!("Chapter {} not found", chapterId)))?;
 
+    println!("[get_chapter_content] chapter.file_path: {}", chapter.file_path);
+
     // Read content from file
     let file_path = workspace.join(&chapter.file_path);
-    let content = std::fs::read_to_string(&file_path)
-        .map_err(|e| crate::AppError::Io(format!("Failed to read chapter file: {}", e)))?;
+    println!("[get_chapter_content] full file path: {:?}", file_path);
 
+    if !file_path.exists() {
+        return Err(crate::AppError::Io(format!("Chapter file does not exist: {:?}", file_path)));
+    }
+
+    let content = std::fs::read_to_string(&file_path)
+        .map_err(|e| crate::AppError::Io(format!("Failed to read chapter file {:?}: {}", file_path, e)))?;
+
+    println!("[get_chapter_content] content length: {}", content.len());
     Ok(content)
 }
 
@@ -227,4 +245,84 @@ pub async fn seed_categories(
 ) -> AppResult<usize> {
     let path = Path::new(&configPath);
     super::seed::seed_categories_from_config(&pool, path).await
+}
+
+/// Fetch book metadata from source website
+#[tauri::command]
+pub async fn fetch_book_metadata(
+    #[allow(non_snake_case)]
+    workspacePath: String,
+    #[allow(non_snake_case)]
+    bookId: Option<i64>,
+    #[allow(non_snake_case)]
+    sourceSite: String,
+    title: String,
+    author: Option<String>,
+) -> AppResult<serde_json::Value> {
+    let workspace = Path::new(&workspacePath);
+
+    // Scrape metadata from website
+    let metadata = scraper::scrape_metadata(
+        &sourceSite,
+        &title,
+        author.as_deref(),
+    )
+    .await?;
+
+    let mut result = serde_json::json!({
+        "description": metadata.description,
+        "author": metadata.author,
+        "category": metadata.category,
+    });
+
+    // Download cover if available and bookId is provided
+    if let (Some(ref cover_url), Some(id)) = (metadata.cover_url.as_ref(), bookId) {
+        // Create or get book directory
+        let book_dir = workspace.join("books").join(format!("book-{}", id));
+
+        // Download and save cover
+        match scraper::download_cover(cover_url, &book_dir).await {
+            Ok(cover_path) => {
+                result["coverPath"] = serde_json::json!(cover_path);
+            }
+            Err(e) => {
+                println!("Warning: Failed to download cover: {}", e);
+                // Continue without cover
+            }
+        }
+    } else if let Some(cover_url) = metadata.cover_url {
+        // Return cover URL for preview (before book is created)
+        result["coverUrl"] = serde_json::json!(cover_url);
+    }
+
+    Ok(result)
+}
+
+/// Delete a book and all its data
+#[tauri::command]
+pub async fn delete_book(
+    pool: State<'_, SqlitePool>,
+    #[allow(non_snake_case)]
+    workspacePath: String,
+    #[allow(non_snake_case)]
+    bookId: i64,
+) -> AppResult<()> {
+    let workspace = Path::new(&workspacePath);
+
+    // Get book info first
+    let books = database::list_books(&pool).await?;
+    let book = books.iter().find(|b| b.id == bookId)
+        .ok_or_else(|| crate::AppError::NotFound(format!("Book {} not found", bookId)))?;
+
+    // Delete book directory
+    let book_dir = workspace.join(&book.book_dir);
+    if book_dir.exists() {
+        std::fs::remove_dir_all(&book_dir)
+            .map_err(|e| crate::AppError::Io(format!("Failed to delete book directory: {}", e)))?;
+    }
+
+    // Delete from database (cascades to chapters)
+    database::delete_book(&pool, bookId).await?;
+
+    Ok(())
 }

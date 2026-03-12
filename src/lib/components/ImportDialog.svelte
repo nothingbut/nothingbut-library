@@ -1,7 +1,9 @@
 <script lang="ts">
   import { open } from '@tauri-apps/plugin-dialog';
-  import { previewImport, importNovel, createCategory, listCategories } from '$lib/services/api';
+  import { previewImport, importNovel, createCategory, listCategories, listBooks, fetchBookMetadata } from '$lib/services/api';
   import type { ImportPreview } from '$lib/services/api';
+  import { CATEGORIES } from '$lib/data/categories';
+  import { SOURCE_SITES } from '$lib/data/sourceSites';
 
   // Props
   interface Props {
@@ -13,21 +15,30 @@
   let { isOpen = $bindable(false), onClose, onSuccess }: Props = $props();
 
   // State
-  let step = $state<'select' | 'parsing' | 'edit' | 'importing' | 'success' | 'error'>('select');
+  let step = $state<'select' | 'parsing' | 'edit' | 'importing' | 'success' | 'error' | 'duplicate-confirm'>('select');
   let selectedFile = $state<string | null>(null);
   let preview = $state<ImportPreview | null>(null);
   let error = $state<string | null>(null);
   let parsing = $state(false);
   let importing = $state(false);
+  let refreshing = $state(false);
+  let duplicateMessage = $state<string | null>(null);
 
   // Form data
   let title = $state('');
   let author = $state('');
   let description = $state('');
-  let category = $state('');
+  let mainCategory = $state('');
+  let subCategory = $state('');
+  let sourceSite = $state('');
 
   // Workspace path (hardcoded for now)
   const workspacePath = '/Users/shichang/Workspace/program/.worktrees/nothingbut-mvp/claude/nothingbut-library';
+
+  // Get subcategories for selected main category
+  const subcategories = $derived(
+    mainCategory ? CATEGORIES.find(c => c.category === mainCategory)?.subcategories || [] : []
+  );
 
   // Select file and immediately parse
   async function selectFile() {
@@ -45,8 +56,6 @@
         // Extract filename as default title
         const filename = selected.split('/').pop() || '';
         title = filename.replace('.txt', '');
-        author = '未知作者';
-        category = '未分类';
 
         // Immediately parse the file
         await parseFile();
@@ -71,14 +80,14 @@
 
       console.log('Parsing file:', {
         file: selectedFile,
-        title,
-        category: category || '未分类'
+        title
       });
 
+      const categoryStr = mainCategory && subCategory ? `${mainCategory}/${subCategory}` : (mainCategory || '未分类');
       preview = await previewImport(
         selectedFile,
         title,
-        category || '未分类'
+        categoryStr
       );
 
       console.log('Parse successful:', preview);
@@ -91,7 +100,8 @@
         description = preview.description;
       }
 
-      step = 'edit';
+      // Check for duplicates before continuing
+      await checkDuplicates();
     } catch (e) {
       console.error('Parse error details:', e);
       // Try to get more detailed error message
@@ -103,6 +113,124 @@
       step = 'error';
     } finally {
       parsing = false;
+    }
+  }
+
+  // Check for duplicate books
+  async function checkDuplicates() {
+    try {
+      const books = await listBooks();
+      const duplicate = books.find(
+        b => b.title === title && b.author === author
+      );
+
+      if (duplicate) {
+        duplicateMessage = `已存在相同书名和作者的图书。\n书名：${duplicate.title}\n作者：${duplicate.author || '未知'}`;
+        step = 'duplicate-confirm';
+      } else {
+        step = 'edit';
+      }
+    } catch (e) {
+      console.error('Failed to check duplicates:', e);
+      // Continue to edit step even if duplicate check fails
+      step = 'edit';
+    }
+  }
+
+  // Confirm duplicate import
+  function confirmDuplicateImport() {
+    duplicateMessage = null;
+    step = 'edit';
+  }
+
+  // Refresh metadata from source site
+  async function handleRefreshMetadata() {
+    if (!sourceSite || !title) {
+      return;
+    }
+
+    try {
+      refreshing = true;
+      error = null;
+
+      console.log('Fetching metadata from:', sourceSite, 'for book:', title, 'author:', author);
+
+      const metadata = await fetchBookMetadata(
+        workspacePath,
+        null, // No bookId yet (before import)
+        sourceSite,
+        title,
+        author || undefined
+      );
+
+      console.log('Fetched metadata:', metadata);
+
+      // Update form fields with fetched data
+      if (metadata.description) {
+        description = metadata.description;
+      }
+      if (metadata.author) {
+        author = metadata.author;
+      }
+
+      // Parse and fill category information
+      if (metadata.category) {
+        // Try to match with existing categories
+        const categoryText = metadata.category.trim();
+
+        // Check if it matches any of our main categories
+        for (const cat of CATEGORIES) {
+          if (categoryText.includes(cat.category)) {
+            mainCategory = cat.category;
+
+            // Check if there's a subcategory match
+            for (const subcat of cat.subcategories) {
+              if (categoryText.includes(subcat)) {
+                subCategory = subcat;
+                break;
+              }
+            }
+            break;
+          }
+        }
+
+        // If no exact match, check subcategories first
+        if (!mainCategory) {
+          for (const cat of CATEGORIES) {
+            for (const subcat of cat.subcategories) {
+              if (categoryText.includes(subcat)) {
+                mainCategory = cat.category;
+                subCategory = subcat;
+                break;
+              }
+            }
+            if (mainCategory) break;
+          }
+        }
+      }
+
+      // Show success message
+      const parts = [];
+      if (metadata.description) parts.push('简介');
+      if (metadata.author) parts.push('作者');
+      if (metadata.category) parts.push('分类');
+      if (metadata.coverUrl) parts.push('封面URL');
+
+      if (parts.length > 0) {
+        alert(`成功获取 ${parts.join('、')} 信息！`);
+      } else {
+        alert('未找到相关信息');
+      }
+
+    } catch (e) {
+      console.error('Failed to refresh metadata:', e);
+      if (e && typeof e === 'object' && 'message' in e) {
+        error = `获取信息失败: ${e.message}`;
+      } else {
+        error = `获取信息失败: ${String(e)}`;
+      }
+    } finally {
+      refreshing = false;
     }
   }
 
@@ -118,13 +246,9 @@
       step = 'importing';
       error = null;
 
-      // Parse category (format: "主分类/子分类" or just "主分类")
+      // Handle category selection
       let categoryId: number | undefined;
-      if (category) {
-        const parts = category.split('/').map(s => s.trim());
-        const mainCategory = parts[0];
-        const subCategory = parts[1];
-
+      if (mainCategory) {
         try {
           // Check if main category exists, create if not
           const categories = await listCategories();
@@ -158,7 +282,8 @@
         title,
         author || undefined,
         description || undefined,
-        categoryId
+        categoryId,
+        sourceSite || undefined
       );
 
       step = 'success';
@@ -183,10 +308,13 @@
     selectedFile = null;
     preview = null;
     error = null;
+    duplicateMessage = null;
     title = '';
     author = '';
     description = '';
-    category = '';
+    mainCategory = '';
+    subCategory = '';
+    sourceSite = '';
   }
 
   // Close dialog
@@ -196,10 +324,13 @@
     selectedFile = null;
     preview = null;
     error = null;
+    duplicateMessage = null;
     title = '';
     author = '';
     description = '';
-    category = '';
+    mainCategory = '';
+    subCategory = '';
+    sourceSite = '';
     onClose?.();
   }
 
@@ -263,6 +394,16 @@
             <p class="status-text">正在解析文件...</p>
             <p class="status-subtext">提取章节信息和元数据</p>
           </div>
+        {:else if step === 'duplicate-confirm'}
+          <!-- Duplicate Confirmation -->
+          <div class="status-section">
+            <div class="warning-icon">⚠</div>
+            <p class="status-text">发现重复</p>
+            {#if duplicateMessage}
+              <p class="status-subtext warning">{duplicateMessage}</p>
+            {/if}
+            <p class="status-subtext">您仍然可以继续导入，或者选择重新选择文件。</p>
+          </div>
         {:else if step === 'edit' && preview}
           <!-- Step 3: Edit Metadata & Preview -->
           <div class="edit-section">
@@ -301,14 +442,59 @@
               </div>
 
               <div class="form-group">
-                <label class="form-label">分类</label>
-                <input
-                  type="text"
-                  class="form-input"
-                  bind:value={category}
-                  placeholder="例如：科幻、历史"
-                />
+                <label class="form-label">首发网站</label>
+                <div class="form-group-with-action">
+                  <select
+                    class="form-select"
+                    bind:value={sourceSite}
+                  >
+                    {#each SOURCE_SITES as site}
+                      <option value={site === '--' ? '' : site}>{site}</option>
+                    {/each}
+                  </select>
+                  <button
+                    class="btn btn-secondary btn-icon"
+                    onclick={handleRefreshMetadata}
+                    disabled={!sourceSite || refreshing}
+                    title="从网站抓取简介和封面"
+                  >
+                    {#if refreshing}
+                      <span class="spinner-small"></span>
+                    {:else}
+                      🔄
+                    {/if}
+                  </button>
+                </div>
               </div>
+
+              <div class="form-group">
+                <label class="form-label">主分类</label>
+                <select
+                  class="form-select"
+                  bind:value={mainCategory}
+                  onchange={() => { subCategory = ''; }}
+                >
+                  <option value="">-- 选择主分类 --</option>
+                  {#each CATEGORIES as cat}
+                    <option value={cat.category}>{cat.category}</option>
+                  {/each}
+                </select>
+              </div>
+
+              {#if mainCategory && subcategories.length > 0}
+                <div class="form-group">
+                  <label class="form-label">子分类</label>
+                  <select
+                    class="form-select"
+                    bind:value={subCategory}
+                  >
+                    <option value="">-- 选择子分类（可选） --</option>
+                    {#each subcategories as subcat}
+                      <option value={subcat}>{subcat}</option>
+                    {/each}
+                  </select>
+                </div>
+              {/if}
 
               <div class="form-group">
                 <label class="form-label">简介</label>
@@ -369,6 +555,11 @@
       <div class="dialog-footer">
         {#if step === 'select'}
           <button class="btn btn-secondary" onclick={handleClose}>取消</button>
+        {:else if step === 'duplicate-confirm'}
+          <button class="btn btn-secondary" onclick={handleBack}>重新选择</button>
+          <button class="btn btn-primary" onclick={confirmDuplicateImport}>
+            继续导入
+          </button>
         {:else if step === 'edit'}
           <button class="btn btn-secondary" onclick={handleBack}>重新选择</button>
           <button
@@ -500,6 +691,16 @@
     gap: 8px;
   }
 
+  .form-group-with-action {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .form-group-with-action .form-select {
+    flex: 1;
+  }
+
   .form-label {
     font-size: 14px;
     font-weight: 500;
@@ -507,7 +708,8 @@
   }
 
   .form-input,
-  .form-textarea {
+  .form-textarea,
+  .form-select {
     width: 100%;
     padding: 10px 12px;
     border-radius: 6px;
@@ -519,7 +721,8 @@
   }
 
   .form-input:focus,
-  .form-textarea:focus {
+  .form-textarea:focus,
+  .form-select:focus {
     outline: none;
     border-color: var(--color-primary);
   }
@@ -531,6 +734,10 @@
   .form-textarea {
     resize: vertical;
     font-family: inherit;
+  }
+
+  .form-select {
+    cursor: pointer;
   }
 
   /* Edit Section */
@@ -661,6 +868,19 @@
     margin-bottom: 24px;
   }
 
+  .warning-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background-color: #ff9800;
+    color: white;
+    font-size: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+
   .status-text {
     font-size: 18px;
     font-weight: 600;
@@ -672,10 +892,15 @@
     font-size: 14px;
     color: var(--color-text-secondary);
     margin: 0;
+    white-space: pre-line;
   }
 
   .status-subtext.error {
     color: #f44336;
+  }
+
+  .status-subtext.warning {
+    color: #ff9800;
   }
 
   /* Button Styles */
@@ -711,6 +936,25 @@
 
   .btn-secondary:hover:not(:disabled) {
     background-color: var(--color-bg-hover);
+  }
+
+  .btn-icon {
+    padding: 10px;
+    min-width: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .spinner-small {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--color-bg-secondary);
+    border-top-color: var(--color-text-secondary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
   }
 
   /* Error Message */

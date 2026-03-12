@@ -59,15 +59,31 @@ impl TxtParser {
     /// Default chapter recognition patterns
     fn default_patterns() -> Vec<String> {
         vec![
-            // Chapter 1, Chapter 001, etc.
+            // Volume patterns (卷)
+            r"^第[0-9零一二三四五六七八九十百千万]+卷\s+.+$".to_string(),
+            r"^第[0-9]+卷\s+.+$".to_string(),
+            r"^第[0-9零一二三四五六七八九十百千万]+卷[:：].+$".to_string(),
+            // Chapter patterns (章)
             r"^第[0-9零一二三四五六七八九十百千万]+章\s+.+$".to_string(),
             r"^第[0-9]+章\s+.+$".to_string(),
-            // Chapter 1:, Chapter 001:, etc.
             r"^第[0-9零一二三四五六七八九十百千万]+章[:：].+$".to_string(),
+            // Section patterns (节)
+            r"^第[0-9零一二三四五六七八九十百千万]+节\s+.+$".to_string(),
+            r"^第[0-9]+节\s+.+$".to_string(),
+            r"^第[0-9零一二三四五六七八九十百千万]+节[:：].+$".to_string(),
+            // Part patterns (回、部)
+            r"^第[0-9零一二三四五六七八九十百千万]+回\s+.+$".to_string(),
+            r"^第[0-9]+回\s+.+$".to_string(),
+            r"^第[0-9零一二三四五六七八九十百千万]+部\s+.+$".to_string(),
+            r"^第[0-9]+部\s+.+$".to_string(),
+            // Special patterns (楔子、序章、引子、终幕、后记、番外、完本感言)
+            r"^(楔子|序章|序言|序 |引子|终幕|后记|番外|完本感言).*$".to_string(),
             // Simple patterns
             r"^章节\s*[0-9]+\s+.+$".to_string(),
             r"^Chapter\s+\d+\s+.+$".to_string(),
             r"^CHAPTER\s+\d+\s+.+$".to_string(),
+            r"^Volume\s+\d+\s+.+$".to_string(),
+            r"^Section\s+\d+\s+.+$".to_string(),
         ]
     }
 
@@ -193,69 +209,154 @@ impl TxtParser {
         let mut author = None;
         let mut description = None;
 
-        // Try to extract from first few lines
-        let lines: Vec<&str> = content.lines().take(20).collect();
+        // Try to extract from first 50 lines
+        let lines: Vec<&str> = content.lines().take(50).collect();
 
-        for line in &lines {
+        // Enhanced author patterns
+        let author_patterns = vec![
+            r"(?i)^作者[:：\s]+(.+)$",
+            r"(?i)^author[:：\s]+(.+)$",
+            r"(?i)^文\s*[:：]\s*(.+)$",
+            r"(?i)^by[:：\s]+(.+)$",
+        ];
+
+        // Enhanced description patterns
+        let desc_patterns = vec![
+            r"(?i)^(简介|内容简介|内容介绍|简要介绍|作品简介|小说简介|书籍简介)[:：\s]+(.+)$",
+            r"(?i)^(introduction|description)[:：\s]+(.+)$",
+        ];
+
+        let mut desc_start_idx = None;
+        let mut in_description = false;
+
+        for (idx, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
 
             // Try to match author patterns
             if author.is_none() {
-                if let Some(captures) = Regex::new(r"(?i)^作者[:：\s]+(.+)$")
-                    .ok()
-                    .and_then(|re| re.captures(trimmed))
-                {
-                    author = Some(captures[1].trim().to_string());
-                    continue;
+                for pattern in &author_patterns {
+                    if let Some(captures) = Regex::new(pattern)
+                        .ok()
+                        .and_then(|re| re.captures(trimmed))
+                    {
+                        let extracted = captures.get(captures.len() - 1).unwrap().as_str().trim();
+                        if !extracted.is_empty() && extracted.chars().count() <= 30 {
+                            author = Some(extracted.to_string());
+                            break;
+                        }
+                    }
                 }
             }
 
             // Try to match description patterns
-            if description.is_none() {
-                if let Some(captures) = Regex::new(r"(?i)^(简介|内容简介|内容介绍)[:：\s]+(.+)$")
-                    .ok()
-                    .and_then(|re| re.captures(trimmed))
-                {
-                    description = Some(captures[2].trim().to_string());
-                    continue;
+            if description.is_none() && !in_description {
+                for pattern in &desc_patterns {
+                    if let Some(captures) = Regex::new(pattern)
+                        .ok()
+                        .and_then(|re| re.captures(trimmed))
+                    {
+                        let extracted = captures.get(captures.len() - 1).unwrap().as_str().trim();
+                        if !extracted.is_empty() {
+                            desc_start_idx = Some(idx);
+                            in_description = true;
+                            break;
+                        }
+                    }
                 }
-            }
-
-            // If we found both, stop early
-            if author.is_some() && description.is_some() {
-                break;
             }
         }
 
-        // If description not found with prefix, try to extract first paragraph
+        // Extract multi-line description if found
+        if let Some(start_idx) = desc_start_idx {
+            let mut desc_lines = Vec::new();
+
+            for line in lines.iter().skip(start_idx) {
+                let trimmed = line.trim();
+
+                // Stop at chapter title or next metadata field
+                let is_chapter = self.chapter_patterns.iter().any(|re| re.is_match(trimmed));
+                let is_next_metadata = Regex::new(r"(?i)^(作者|标签|类型|状态|字数|分类|更新)[:：]")
+                    .ok()
+                    .map(|re| re.is_match(trimmed))
+                    .unwrap_or(false);
+
+                if is_chapter || is_next_metadata {
+                    break;
+                }
+
+                if !trimmed.is_empty() {
+                    desc_lines.push(trimmed);
+                } else if !desc_lines.is_empty() {
+                    // Allow one empty line, but stop at two consecutive empty lines
+                    break;
+                }
+            }
+
+            if !desc_lines.is_empty() {
+                // Extract description text (skip the label line if it only contains label)
+                let first_line = desc_lines[0];
+                if let Some(captures) = Regex::new(r"(?i)^(简介|内容简介|内容介绍|简要介绍|作品简介|小说简介|书籍简介)[:：\s]+(.+)$")
+                    .ok()
+                    .and_then(|re| re.captures(first_line))
+                {
+                    // First line has both label and content
+                    let first_content = captures.get(2).unwrap().as_str().trim();
+                    if desc_lines.len() > 1 {
+                        desc_lines[0] = first_content;
+                    } else if !first_content.is_empty() {
+                        desc_lines = vec![first_content];
+                    } else {
+                        desc_lines.clear();
+                    }
+                }
+
+                let desc_text = desc_lines.join("");
+                if desc_text.chars().count() >= 10 && desc_text.chars().count() <= 500 {
+                    description = Some(desc_text);
+                }
+            }
+        }
+
+        // If description still not found, try to extract first meaningful paragraph
         if description.is_none() {
-            // Skip empty lines and find first meaningful paragraph
             let mut paragraph_lines = Vec::new();
-            let mut in_paragraph = false;
+            let mut found_content = false;
 
             for line in &lines {
                 let trimmed = line.trim();
 
-                // Skip chapter titles and author lines
+                // Skip metadata lines, chapter titles, and empty lines at start
                 let is_chapter = self.chapter_patterns.iter().any(|re| re.is_match(trimmed));
-                let is_metadata = trimmed.starts_with("作者") || trimmed.starts_with("简介");
+                let is_metadata = Regex::new(r"(?i)^(作者|简介|标签|类型|状态|字数|分类|更新)[:：]")
+                    .ok()
+                    .map(|re| re.is_match(trimmed))
+                    .unwrap_or(false);
 
                 if is_chapter || is_metadata {
+                    if found_content {
+                        break;
+                    }
                     continue;
                 }
 
                 if !trimmed.is_empty() {
-                    in_paragraph = true;
+                    found_content = true;
                     paragraph_lines.push(trimmed);
-                } else if in_paragraph {
-                    // End of paragraph
+
+                    // Stop if we have enough content
+                    let current_text = paragraph_lines.join("");
+                    if current_text.chars().count() >= 50 {
+                        break;
+                    }
+                } else if found_content {
+                    // Stop at first empty line after content
                     break;
                 }
             }
 
             if !paragraph_lines.is_empty() {
                 let paragraph = paragraph_lines.join("");
-                if paragraph.chars().count() >= 10 {
+                if paragraph.chars().count() >= 10 && paragraph.chars().count() <= 500 {
                     description = Some(paragraph);
                 }
             }

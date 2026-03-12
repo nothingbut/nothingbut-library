@@ -4,6 +4,7 @@ mod commands_test;
 pub mod database;
 pub mod models;
 pub mod parser;
+pub mod scraper;
 pub mod seed;
 pub mod storage;
 

@@ -164,6 +164,7 @@ mod tests {
             Some("这是一个测试小说"),
             None,
             Some(category_id),
+            None,
             "books/book-1",
             file_size,
             total_words,
@@ -189,12 +190,15 @@ mod tests {
             let file_path = storage::save_chapter(&book_dir, idx + 1, chapter).unwrap();
             let word_count = storage::count_words(&chapter.content) as i64;
 
+            // Store full relative path from workspace
+            let full_file_path = format!("books/book-{}/{}", book_id, file_path);
+
             database::insert_chapter(
                 &pool,
                 book_id,
                 &chapter.title,
                 &chapter.preview,
-                &file_path,
+                &full_file_path,
                 (idx + 1) as i32,
                 word_count,
             )
@@ -267,6 +271,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             "books/book-1",
             0,
             0,
@@ -294,6 +299,7 @@ mod tests {
             Some("描述"),
             None,
             None,
+            None,
             "books/book-1",
             1024,
             5000,
@@ -308,7 +314,7 @@ mod tests {
             book_id,
             "第一章",
             "Preview...",
-            "chapters/chapter-0001.txt",
+            "books/book-1/chapters/chapter-0001.txt",
             1,
             2500,
         )
@@ -319,7 +325,8 @@ mod tests {
             &pool,
             book_id,
             "第二章",
-            "chapters/chapter-0002.txt",
+            "Preview...",
+            "books/book-1/chapters/chapter-0002.txt",
             2,
             2500,
         )
@@ -351,6 +358,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             "books/book-1",
             0,
             0,
@@ -364,6 +372,7 @@ mod tests {
             &pool,
             book_id,
             "Test Chapter",
+            "Test preview",
             "books/book-1/chapters/chapter-0001.txt",
             1,
             100,

@@ -55,16 +55,41 @@
         return;
       }
 
+      console.log('Loading chapter:', {
+        chapterId,
+        workspacePath,
+        chapter
+      });
+
       // Load chapter content from file
       const content = await getChapterContent(workspacePath, chapterId);
+
+      console.log('Chapter content loaded, length:', content.length);
 
       selectedChapter = {
         ...chapter,
         content
       };
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to load chapter';
-      console.error('Failed to load chapter:', e);
+      console.error('Failed to load chapter - full error:', e);
+      console.error('Error type:', typeof e);
+      if (e && typeof e === 'object') {
+        console.error('Error keys:', Object.keys(e));
+        console.error('Error values:', Object.values(e));
+        console.error('Error stringified:', JSON.stringify(e, null, 2));
+        // Check if it's a Tauri error response
+        if ('message' in e) {
+          console.error('Error message:', (e as any).message);
+          error = (e as any).message;
+        } else if ('error' in e) {
+          console.error('Error.error:', (e as any).error);
+          error = (e as any).error;
+        } else {
+          error = JSON.stringify(e);
+        }
+      } else {
+        error = e instanceof Error ? e.message : String(e);
+      }
     } finally {
       loading = false;
     }

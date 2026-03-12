@@ -66,6 +66,7 @@ pub struct NovelBook {
     pub description: Option<String>,
     pub cover_path: Option<String>,
     pub category_id: Option<i64>,
+    pub source_site: Option<String>,
     pub book_dir: String,
     pub file_size: i64,
     pub word_count: i64,

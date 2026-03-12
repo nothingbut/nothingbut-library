@@ -17,3 +17,9 @@ vite.config.ts.timestamp-*
 # Test data (temporary, for manual testing)
 /data/
 test*.txt
+
+# Novel data files
+books/
+library.db
+library.db-shm
+library.db-wal

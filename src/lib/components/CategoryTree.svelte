@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { listCategories, listBooks } from '$lib/services/api';
+  import { listCategories, listBooks, deleteBook } from '$lib/services/api';
   import type { Category, Book, BookStatus } from '$lib/types';
 
   // Props
@@ -25,11 +25,27 @@
     categoryId?: number;
   }
 
+  interface ContextMenuState {
+    visible: boolean;
+    x: number;
+    y: number;
+    node: TreeNode | null;
+  }
+
   // State
   let tree = $state<TreeNode[]>([]);
   let selectedId = $state<string | number | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
+  let contextMenu = $state<ContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+    node: null,
+  });
+
+  // Workspace path (hardcoded for now)
+  const workspacePath = '/Users/shichang/Workspace/program/.worktrees/nothingbut-mvp/claude/nothingbut-library';
 
   // Build tree from API data
   async function loadTree() {
@@ -159,8 +175,80 @@
     return colors[status];
   }
 
+  // Show context menu
+  function showContextMenu(event: MouseEvent, node: TreeNode) {
+    // Only show context menu for books
+    if (node.type !== 'book') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    contextMenu = {
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+      node,
+    };
+  }
+
+  // Hide context menu
+  function hideContextMenu() {
+    contextMenu = {
+      visible: false,
+      x: 0,
+      y: 0,
+      node: null,
+    };
+  }
+
+  // Delete book
+  async function handleDeleteBook() {
+    if (!contextMenu.node || !contextMenu.node.bookId) {
+      return;
+    }
+
+    const bookName = contextMenu.node.name;
+    const bookId = contextMenu.node.bookId;
+
+    // Confirm deletion
+    if (!confirm(`确定要删除《${bookName}》吗？\n\n这将删除所有章节文件和相关数据，此操作不可恢复。`)) {
+      hideContextMenu();
+      return;
+    }
+
+    try {
+      await deleteBook(workspacePath, bookId);
+
+      // Reload tree
+      await loadTree();
+
+      // Clear selection if deleted book was selected
+      if (selectedId === contextMenu.node.id) {
+        selectedId = null;
+        if (onSelectBook) {
+          onSelectBook(0); // Clear selection in parent
+        }
+      }
+
+      alert('删除成功');
+    } catch (e) {
+      console.error('Failed to delete book:', e);
+      alert('删除失败: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      hideContextMenu();
+    }
+  }
+
   onMount(() => {
     loadTree();
+
+    // Hide context menu on click anywhere
+    const handleClick = () => hideContextMenu();
+    document.addEventListener('click', handleClick);
+
+    return () => {
+      document.removeEventListener('click', handleClick);
+    };
   });
 </script>
 
@@ -170,7 +258,10 @@
   {@const isBook = node.type === 'book'}
 
   <div class="tree-node" style="--level: {level}">
-    <div class="node-header {isSelected ? 'selected' : ''}">
+    <div
+      class="node-header {isSelected ? 'selected' : ''}"
+      oncontextmenu={(e) => showContextMenu(e, node)}
+    >
       {#if hasChildren}
         <button
           class="expand-toggle"
@@ -219,6 +310,20 @@
     {/each}
   {/if}
 </div>
+
+<!-- Context Menu -->
+{#if contextMenu.visible && contextMenu.node}
+  <div
+    class="context-menu"
+    style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
+    onclick={(e) => e.stopPropagation()}
+  >
+    <button class="context-menu-item danger" onclick={handleDeleteBook}>
+      <span class="menu-icon">🗑️</span>
+      <span>删除小说</span>
+    </button>
+  </div>
+{/if}
 
 <style>
   .category-tree {
@@ -344,5 +449,50 @@
 
   .tree-error {
     color: red;
+  }
+
+  /* Context Menu */
+  .context-menu {
+    position: fixed;
+    z-index: 10000;
+    background-color: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 4px;
+    min-width: 160px;
+  }
+
+  .context-menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--color-text-primary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
+  }
+
+  .context-menu-item:hover {
+    background-color: var(--color-bg-hover);
+  }
+
+  .context-menu-item.danger {
+    color: #dc3545;
+  }
+
+  .context-menu-item.danger:hover {
+    background-color: #dc35451a;
+  }
+
+  .menu-icon {
+    font-size: 16px;
+    line-height: 1;
   }
 </style>

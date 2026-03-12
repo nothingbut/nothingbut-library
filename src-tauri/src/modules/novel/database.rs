@@ -11,6 +11,7 @@ pub async fn insert_book(
     description: Option<&str>,
     cover_path: Option<&str>,
     category_id: Option<i64>,
+    source_site: Option<&str>,
     book_dir: &str,
     file_size: i64,
     word_count: i64,
@@ -23,11 +24,11 @@ pub async fn insert_book(
     let result = sqlx::query(
         r#"
         INSERT INTO novel_books (
-            title, author, description, cover_path, category_id,
+            title, author, description, cover_path, category_id, source_site,
             book_dir, file_size, word_count, chapter_count, status,
             created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
     )
     .bind(title)
@@ -35,6 +36,7 @@ pub async fn insert_book(
     .bind(description)
     .bind(cover_path)
     .bind(category_id)
+    .bind(source_site)
     .bind(book_dir)
     .bind(file_size)
     .bind(word_count)
@@ -54,7 +56,7 @@ pub async fn list_books(pool: &SqlitePool) -> AppResult<Vec<NovelBook>> {
     let rows = sqlx::query(
         r#"
         SELECT
-            id, title, author, description, cover_path, category_id,
+            id, title, author, description, cover_path, category_id, source_site,
             book_dir, file_size, word_count, chapter_count, status,
             reading_progress, last_read_at, created_at, updated_at
         FROM novel_books
@@ -94,6 +96,7 @@ pub async fn list_books(pool: &SqlitePool) -> AppResult<Vec<NovelBook>> {
                 description: row.get("description"),
                 cover_path: row.get("cover_path"),
                 category_id: row.get("category_id"),
+                source_site: row.get("source_site"),
                 book_dir: row.get("book_dir"),
                 file_size: row.get("file_size"),
                 word_count: row.get("word_count"),
@@ -276,6 +279,17 @@ pub async fn list_categories(pool: &SqlitePool) -> AppResult<Vec<NovelCategory>>
     Ok(categories)
 }
 
+/// Delete a book
+pub async fn delete_book(pool: &SqlitePool, book_id: i64) -> AppResult<()> {
+    sqlx::query("DELETE FROM novel_books WHERE id = ?")
+        .bind(book_id)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Database(format!("Failed to delete book: {}", e)))?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359,6 +373,7 @@ mod tests {
             Some("Test description"),
             None,
             None,
+            None,
             "books/book-1",
             1024000,
             50000,
@@ -390,6 +405,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             "books/book-1",
             0,
             0,
@@ -403,7 +419,8 @@ mod tests {
             &pool,
             book_id,
             "Chapter 1",
-            "chapters/chapter-0001.txt",
+            "Chapter 1 preview",
+            "books/book-1/chapters/chapter-0001.txt",
             1,
             5000,
         )
@@ -414,7 +431,8 @@ mod tests {
             &pool,
             book_id,
             "Chapter 2",
-            "chapters/chapter-0002.txt",
+            "Chapter 2 preview",
+            "books/book-1/chapters/chapter-0002.txt",
             2,
             5500,
         )
