@@ -210,6 +210,10 @@ async fn fetch_qidian_book_details(client: &reqwest::Client, book_id: &str) -> A
 
 /// Scrape metadata from Qidian using JSON API (more reliable than HTML scraping)
 async fn scrape_qidian_api(client: &reqwest::Client, title: &str, author: Option<&str>) -> AppResult<ScrapedMetadata> {
+    println!("=== 起点API调用开始 ===");
+    println!("输入书名: {}", title);
+    println!("输入作者: {:?}", author);
+
     let search_query = if let Some(auth) = author {
         format!("{} {}", title, auth)
     } else {
@@ -221,7 +225,9 @@ async fn scrape_qidian_api(client: &reqwest::Client, title: &str, author: Option
         urlencoding::encode(&search_query)
     );
 
-    println!("Calling Qidian JSON API: {}", api_url);
+    println!("搜索关键词: {}", search_query);
+    println!("API URL: {}", api_url);
+    println!("发送请求...");
 
     let response = client
         .get(&api_url)
@@ -230,22 +236,51 @@ async fn scrape_qidian_api(client: &reqwest::Client, title: &str, author: Option
         .header("Referer", "https://www.qidian.com/")
         .send()
         .await
-        .map_err(|e| AppError::Io(format!("Failed to call Qidian API: {}", e)))?;
+        .map_err(|e| {
+            println!("❌ API请求失败: {}", e);
+            AppError::Io(format!("Failed to call Qidian API: {}", e))
+        })?;
 
-    let json: Value = response
-        .json()
+    println!("✅ 收到响应");
+    println!("响应状态码: {}", response.status());
+    println!("响应头: {:?}", response.headers());
+
+    let response_text = response
+        .text()
         .await
-        .map_err(|e| AppError::Io(format!("Failed to parse JSON response: {}", e)))?;
+        .map_err(|e| {
+            println!("❌ 读取响应文本失败: {}", e);
+            AppError::Io(format!("Failed to read response text: {}", e))
+        })?;
 
-    println!("API response: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
+    println!("响应文本长度: {} bytes", response_text.len());
+    println!("响应内容前500字符: {}", &response_text.chars().take(500).collect::<String>());
+
+    let json: Value = serde_json::from_str(&response_text)
+        .map_err(|e| {
+            println!("❌ JSON解析失败: {}", e);
+            println!("完整响应文本: {}", response_text);
+            AppError::Io(format!("Failed to parse JSON response: {}", e))
+        })?;
+
+    println!("✅ JSON解析成功");
+    println!("JSON结构: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
 
     // Parse JSON response to extract book list
+    println!("开始解析书籍列表...");
     let books = json
         .get("data")
         .and_then(|data| data.as_array())
-        .ok_or_else(|| AppError::NotFound("API返回数据格式异常".to_string()))?;
+        .ok_or_else(|| {
+            println!("❌ JSON中没有找到data数组");
+            println!("JSON keys: {:?}", json.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+            AppError::NotFound("API返回数据格式异常".to_string())
+        })?;
+
+    println!("找到 {} 本书", books.len());
 
     if books.is_empty() {
+        println!("❌ 搜索结果为空");
         return Err(AppError::NotFound(format!(
             "在起点未找到《{}》的搜索结果",
             title
@@ -253,59 +288,85 @@ async fn scrape_qidian_api(client: &reqwest::Client, title: &str, author: Option
     }
 
     // Find matching book
-    for book in books {
+    println!("开始匹配书籍...");
+    for (index, book) in books.iter().enumerate() {
+        println!("--- 检查第 {} 本书 ---", index + 1);
+
         let book_title = book.get("bookName")
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        println!("API found book: {}", book_title);
+        let book_author = book.get("authorName")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        println!("书名: {}", book_title);
+        println!("作者: {}", book_author);
 
         // Match title
-        if !book_title.contains(title) && !title.contains(book_title) {
+        let title_match = book_title.contains(title) || title.contains(book_title);
+        println!("书名匹配: {} (输入: {}, API返回: {})", title_match, title, book_title);
+
+        if !title_match {
+            println!("❌ 书名不匹配，跳过");
             continue;
         }
 
         // Match author if provided
         if let Some(auth) = author {
-            let book_author = book.get("authorName")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let author_match = book_author.contains(auth) || auth.contains(book_author);
+            println!("作者匹配: {} (输入: {}, API返回: {})", author_match, auth, book_author);
 
-            if !book_author.contains(auth) && !auth.contains(book_author) {
+            if !author_match {
+                println!("❌ 作者不匹配，跳过");
                 continue;
             }
+        } else {
+            println!("未提供作者，跳过作者匹配");
         }
+
+        println!("✅ 匹配成功！开始提取元数据...");
 
         // Extract metadata from JSON
         let description = book.get("desc")
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
+        println!("简介: {:?}", description.as_ref().map(|s| {
+            if s.len() > 100 {
+                format!("{}...", &s[..100])
+            } else {
+                s.clone()
+            }
+        }));
 
         let cover_url = book.get("img")
             .and_then(|v| v.as_str())
             .map(|src| {
-                if src.starts_with("//") {
+                let full_url = if src.starts_with("//") {
                     format!("https:{}", src)
                 } else if src.starts_with("/") {
                     format!("https://www.qidian.com{}", src)
                 } else {
                     src.to_string()
-                }
+                };
+                println!("封面URL: {}", full_url);
+                full_url
             });
 
         let author_text = book.get("authorName")
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
+        println!("作者: {:?}", author_text);
 
         let category = book.get("cateName")
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
+        println!("分类: {:?}", category);
 
-        println!("Matched book: {} by {:?}, category: {:?}",
-                 book_title, author_text, category);
+        println!("=== 起点API调用成功 ===\n");
 
         return Ok(ScrapedMetadata {
             description,
@@ -314,6 +375,9 @@ async fn scrape_qidian_api(client: &reqwest::Client, title: &str, author: Option
             category,
         });
     }
+
+    println!("❌ 遍历完所有书籍，未找到匹配项");
+    println!("=== 起点API调用结束 ===\n");
 
     Err(AppError::NotFound(format!(
         "在起点API结果中未找到匹配的《{}》",
