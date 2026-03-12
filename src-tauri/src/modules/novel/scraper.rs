@@ -214,6 +214,22 @@ async fn scrape_qidian_api(client: &reqwest::Client, title: &str, author: Option
     println!("输入书名: {}", title);
     println!("输入作者: {:?}", author);
 
+    // Step 1: Visit homepage first to get cookies and bypass WAF
+    println!("步骤1: 访问起点主页建立session...");
+    let homepage_response = client
+        .get("https://www.qidian.com/")
+        .send()
+        .await
+        .map_err(|e| {
+            println!("❌ 访问主页失败: {}", e);
+            AppError::Io(format!("Failed to visit homepage: {}", e))
+        })?;
+
+    println!("✅ 主页访问成功，状态码: {}", homepage_response.status());
+
+    // Wait a bit to simulate human behavior
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
     let search_query = if let Some(auth) = author {
         format!("{} {}", title, auth)
     } else {
@@ -227,13 +243,14 @@ async fn scrape_qidian_api(client: &reqwest::Client, title: &str, author: Option
 
     println!("搜索关键词: {}", search_query);
     println!("API URL: {}", api_url);
-    println!("发送请求...");
+    println!("步骤2: 发送API请求...");
 
     let response = client
         .get(&api_url)
-        .header("Accept", "application/json")
+        .header("Accept", "application/json, text/plain, */*")
         .header("X-Requested-With", "XMLHttpRequest")
         .header("Referer", "https://www.qidian.com/")
+        .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
         .send()
         .await
         .map_err(|e| {
@@ -389,6 +406,7 @@ async fn scrape_qidian_api(client: &reqwest::Client, title: &str, author: Option
 pub async fn scrape_qidian(title: &str, author: Option<&str>) -> AppResult<ScrapedMetadata> {
     let client = reqwest::Client::builder()
         .user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .cookie_store(true)  // Enable automatic cookie handling
         .build()
         .map_err(|e| AppError::Io(format!("Failed to create HTTP client: {}", e)))?;
 
