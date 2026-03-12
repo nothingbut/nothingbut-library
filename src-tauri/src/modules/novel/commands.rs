@@ -138,6 +138,7 @@ pub async fn import_novel(
             &pool,
             book_id,
             &chapter.title,
+            &chapter.preview,
             &file_path,
             (idx + 1) as i32,
             word_count,

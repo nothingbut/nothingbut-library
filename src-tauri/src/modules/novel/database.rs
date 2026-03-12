@@ -115,6 +115,7 @@ pub async fn insert_chapter(
     pool: &SqlitePool,
     book_id: i64,
     title: &str,
+    preview: &str,
     file_path: &str,
     sort_order: i32,
     word_count: i64,
@@ -124,13 +125,14 @@ pub async fn insert_chapter(
     let result = sqlx::query(
         r#"
         INSERT INTO novel_chapters (
-            book_id, title, file_path, sort_order, word_count, created_at
+            book_id, title, preview, file_path, sort_order, word_count, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         "#,
     )
     .bind(book_id)
     .bind(title)
+    .bind(preview)
     .bind(file_path)
     .bind(sort_order)
     .bind(word_count)
@@ -146,7 +148,7 @@ pub async fn insert_chapter(
 pub async fn get_chapter(pool: &SqlitePool, chapter_id: i64) -> AppResult<Option<NovelChapter>> {
     let row = sqlx::query(
         r#"
-        SELECT id, book_id, title, file_path, sort_order, word_count, created_at
+        SELECT id, book_id, title, preview, file_path, sort_order, word_count, created_at
         FROM novel_chapters
         WHERE id = ?
         "#,
@@ -166,6 +168,7 @@ pub async fn get_chapter(pool: &SqlitePool, chapter_id: i64) -> AppResult<Option
             id: row.get("id"),
             book_id: row.get("book_id"),
             title: row.get("title"),
+            preview: row.get("preview"),
             file_path: row.get("file_path"),
             sort_order: row.get("sort_order"),
             word_count: row.get("word_count"),
@@ -178,7 +181,7 @@ pub async fn get_chapter(pool: &SqlitePool, chapter_id: i64) -> AppResult<Option
 pub async fn list_chapters(pool: &SqlitePool, book_id: i64) -> AppResult<Vec<NovelChapter>> {
     let rows = sqlx::query(
         r#"
-        SELECT id, book_id, title, file_path, sort_order, word_count, created_at
+        SELECT id, book_id, title, preview, file_path, sort_order, word_count, created_at
         FROM novel_chapters
         WHERE book_id = ?
         ORDER BY sort_order ASC
@@ -202,6 +205,7 @@ pub async fn list_chapters(pool: &SqlitePool, book_id: i64) -> AppResult<Vec<Nov
                 book_id: row.get("book_id"),
                 title: row.get("title"),
                 file_path: row.get("file_path"),
+                preview: row.get("preview"),
                 sort_order: row.get("sort_order"),
                 word_count: row.get("word_count"),
                 created_at,

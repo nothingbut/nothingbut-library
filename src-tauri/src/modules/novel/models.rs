@@ -50,6 +50,7 @@ pub struct NovelChapter {
     pub id: i64,
     pub book_id: i64,
     pub title: String,
+    pub preview: String, // First line preview (up to 20 chars)
     pub file_path: String,
     pub sort_order: i32,
     pub word_count: i64,
