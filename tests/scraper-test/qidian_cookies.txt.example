@@ -1,0 +1,28 @@
+# 起点中文网Cookies示例配置
+#
+# 如何获取cookies:
+# 1. 在Chrome/Firefox中访问 https://www.qidian.com
+# 2. 完成任何验证（如果有滑动验证码，请完成它）
+# 3. 按F12打开开发者工具
+# 4. 进入 Application/存储 > Cookies > https://www.qidian.com
+# 5. 复制以下cookies的值（每行一个，格式: key=value）
+#
+# 重要的cookies（可能需要的）:
+# - _csrfToken
+# - newstatisticUUID
+# - _ga
+# - _gid
+# - w_tsfp
+#
+# 将此文件复制为 qidian_cookies.txt 并填入实际的cookie值
+
+# 示例（请替换为实际值）:
+_csrfToken=your_csrf_token_here
+newstatisticUUID=your_uuid_here
+_ga=GA1.2.xxxxxxxxxx.xxxxxxxxxx
+_gid=GA1.2.xxxxxxxxxx.xxxxxxxxxx
+
+# 其他可能有用的cookies:
+# w_tsfp=xxxxxxxx
+# e1=xxxxxxxx
+# e2=xxxxxxxx

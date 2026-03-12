@@ -19,6 +19,10 @@ path = "src/test_headless_chrome.rs"
 name = "test_chromiumoxide_stealth"
 path = "src/test_chromiumoxide_stealth.rs"
 
+[[bin]]
+name = "test_with_cookies"
+path = "src/test_with_cookies.rs"
+
 [dependencies]
 reqwest = { version = "0.11", features = ["json", "cookies", "blocking"] }
 scraper = "0.20"
