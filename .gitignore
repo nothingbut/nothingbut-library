@@ -23,3 +23,10 @@ books/
 library.db
 library.db-shm
 library.db-wal
+
+# Rust
+src-tauri/target/
+**/*.rs.bk
+
+# Tauri
+src-tauri/gen/
