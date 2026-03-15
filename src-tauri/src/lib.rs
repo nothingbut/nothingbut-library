@@ -101,6 +101,16 @@ pub fn run() {
             modules::novel::commands::seed_categories,
             modules::novel::commands::fetch_book_metadata,
             modules::novel::commands::delete_book,
+            modules::ai::commands::check_ollama_status,
+            modules::ai::commands::test_ollama_generate,
+            modules::ai::commands::create_conversation,
+            modules::ai::commands::send_message,
+            modules::ai::commands::send_message_stream,
+            modules::ai::commands::get_conversation_history,
+            modules::ai::commands::summarize_chapter,
+            modules::ai::commands::index_chapter,
+            modules::ai::commands::index_book,
+            modules::ai::commands::semantic_search,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

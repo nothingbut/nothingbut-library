@@ -1,84 +1,43 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { listBooks } from '$lib/services/api';
+  import type { Book } from '$lib/types';
 
-  interface Book {
-    id: string;
-    title: string;
-    author: string;
-    coverPath: string;
-    chapterCount: number;
-    readingProgress: number;
+  // Props
+  interface Props {
+    onImport?: () => void;
   }
+
+  let { onImport }: Props = $props();
 
   let books = $state<Book[]>([]);
   let loading = $state(false);
+  let error = $state<string | null>(null);
 
-  function loadBooks() {
-    // TODO: Load books from backend
-    loading = true;
-
-    books = [
-      {
-        id: '1',
-        title: '斗罗大陆',
-        author: '唐家三少',
-        coverPath: '/covers/douluo.jpg',
-        chapterCount: 338,
-        readingProgress: 45,
-      },
-      {
-        id: '2',
-        title: '天龙八部',
-        author: '金庸',
-        coverPath: '/covers/tianlong.jpg',
-        chapterCount: 120,
-        readingProgress: 100,
-      },
-      {
-        id: '3',
-        title: '围城',
-        author: '钱钟书',
-        coverPath: '/covers/weicheng.jpg',
-        chapterCount: 50,
-        readingProgress: 30,
-      },
-      {
-        id: '4',
-        title: '活着',
-        author: '余华',
-        coverPath: '/covers/huozhe.jpg',
-        chapterCount: 20,
-        readingProgress: 60,
-      },
-      {
-        id: '5',
-        title: '许三观卖血记',
-        author: '余华',
-        coverPath: '/covers/xusan.jpg',
-        chapterCount: 40,
-        readingProgress: 25,
-      },
-      {
-        id: '6',
-        title: '红楼梦',
-        author: '曹雪芹',
-        coverPath: '/covers/honglou.jpg',
-        chapterCount: 120,
-        readingProgress: 15,
-      },
-    ];
-
-    loading = false;
+  async function loadBooks() {
+    try {
+      loading = true;
+      error = null;
+      books = await listBooks();
+      console.log('Loaded books:', books.length);
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to load books';
+      console.error('Failed to load books:', e);
+    } finally {
+      loading = false;
+    }
   }
 
   function openBook(book: Book) {
-    // TODO: Navigate to book reading page
-    console.log('Opening book:', book.title);
+    // Navigate to novel page with book context
+    goto(`/novel?bookId=${book.id}`);
   }
 
   function importNovel() {
-    // TODO: Implement novel import dialog
-    console.log('Opening import dialog...');
+    if (onImport) {
+      onImport();
+    }
   }
 
   onMount(() => {
@@ -94,7 +53,14 @@
     </button>
   </div>
 
-  {#if loading}
+  {#if error}
+    <div class="error-state">
+      <div class="error-icon">⚠️</div>
+      <p class="error-title">加载失败</p>
+      <p class="error-message">{error}</p>
+      <button class="primary-btn" onclick={loadBooks}>重试</button>
+    </div>
+  {:else if loading}
     <div class="loading-state">
       <div class="spinner"></div>
       <p>加载中...</p>
@@ -115,23 +81,27 @@
           title={book.title}
         >
           <div class="book-cover">
-            <div class="cover-placeholder">
-              {book.title.charAt(0)}
-            </div>
+            {#if book.cover_path}
+              <img src={book.cover_path} alt={book.title} class="cover-image" />
+            {:else}
+              <div class="cover-placeholder">
+                {book.title.charAt(0)}
+              </div>
+            {/if}
           </div>
           <div class="book-info">
             <h3 class="book-title">{book.title}</h3>
-            <p class="book-author">{book.author}</p>
+            <p class="book-author">{book.author || '未知作者'}</p>
             <div class="book-meta">
-              <span class="chapter-count">{book.chapterCount} 章</span>
+              <span class="chapter-count">{book.chapter_count} 章</span>
               <span class="reading-progress">
-                {book.readingProgress}%
+                {book.reading_progress}%
               </span>
             </div>
             <div class="progress-bar">
               <div
                 class="progress-fill"
-                style="width: {book.readingProgress}%"
+                style="width: {book.reading_progress}%"
               ></div>
             </div>
           </div>
@@ -181,7 +151,8 @@
     background-color: var(--color-primary-hover);
   }
 
-  .loading-state {
+  .loading-state,
+  .error-state {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -189,6 +160,24 @@
     gap: 16px;
     padding: 48px 24px;
     color: var(--color-text-secondary);
+  }
+
+  .error-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+  }
+
+  .error-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0;
+  }
+
+  .error-message {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin: 0;
   }
 
   .spinner {
@@ -282,6 +271,12 @@
     border-radius: 6px;
     overflow: hidden;
     background-color: var(--color-bg-secondary);
+  }
+
+  .cover-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .cover-placeholder {

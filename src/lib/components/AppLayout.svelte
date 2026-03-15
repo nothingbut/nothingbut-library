@@ -1,6 +1,7 @@
 <script lang="ts">
   import { type Snippet } from 'svelte';
   import { page } from '$app/stores';
+  import AIAssistant from './ai/AIAssistant.svelte';
 
   interface Props {
     children: Snippet;
@@ -61,15 +62,10 @@
 
   <!-- Main content area -->
   <main class="main-content" class:with-ai-panel={showAIPanel}>
-    <!-- AI Panel (toggleable) - 左侧 -->
+    <!-- AI Panel (toggleable) - 右侧 -->
     {#if showAIPanel}
       <aside class="ai-panel">
-        <div class="ai-panel-header">
-          <h2>AI 助手</h2>
-        </div>
-        <div class="ai-panel-content">
-          <p class="placeholder-text">AI 助手面板占位</p>
-        </div>
+        <AIAssistant isOpen={showAIPanel} />
       </aside>
     {/if}
 

@@ -1,13 +1,16 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import CategoryTree from '$lib/components/CategoryTree.svelte';
   import ImportDialog from '$lib/components/ImportDialog.svelte';
-  import { listBooks, listChapters, getChapterContent } from '$lib/services/api';
-  import type { Book, Chapter, BookStatus } from '$lib/types';
+  import { listBooks, listChapters, getChapterContent, listCategories } from '$lib/services/api';
+  import type { Book, Chapter, BookStatus, Category } from '$lib/types';
 
   // State
   let selectedBook = $state<Book | null>(null);
   let selectedChapter = $state<Chapter & { content?: string } | null>(null);
   let chapters = $state<Chapter[]>([]);
+  let categories = $state<Category[]>([]);
+  let categoryMap = $state<Map<number, string>>(new Map());
   let loading = $state(false);
   let error = $state<string | null>(null);
   let showImportDialog = $state(false);
@@ -15,6 +18,17 @@
 
   // Workspace path (hardcoded for now, should come from config)
   const workspacePath = '/Users/shichang/Workspace/program/.worktrees/nothingbut-mvp/claude/nothingbut-library';
+
+  // Load categories on mount
+  onMount(async () => {
+    try {
+      categories = await listCategories();
+      // Build category map for quick lookup
+      categoryMap = new Map(categories.map(cat => [cat.id, cat.name]));
+    } catch (e) {
+      console.error('Failed to load categories:', e);
+    }
+  });
 
   // Handlers
   async function handleBookSelect(bookId: number) {
@@ -114,8 +128,8 @@
   }
 
   function getCategoryName(book: Book): string {
-    // TODO: Resolve category name from category_id
-    return book.category_id ? `分类 ${book.category_id}` : '未分类';
+    if (!book.category_id) return '未分类';
+    return categoryMap.get(book.category_id) || `未知分类 (${book.category_id})`;
   }
 
   function getLineCount(chapter: Chapter): number {
