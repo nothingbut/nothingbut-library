@@ -165,6 +165,7 @@ mod tests {
             description: Some("A great novel".to_string()),
             cover_path: Some("covers/book-1.jpg".to_string()),
             category_id: Some(1),
+            source_site: None,
             book_dir: "books/book-1".to_string(),
             file_size: 1024000,
             word_count: 500000,
