@@ -155,3 +155,29 @@ pub struct ImportProgress {
     pub total: usize,
     pub file_name: String,
 }
+
+/// 搜索查询
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchQuery {
+    pub keyword: Option<String>,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub publisher: Option<String>,
+    pub isbn: Option<String>,
+    pub series: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub rating_min: Option<i32>,
+    pub rating_max: Option<i32>,
+    pub sort_by: Option<String>,
+    pub sort_order: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+/// 书籍详情（包含作者和标签）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EpubBookWithDetails {
+    pub book: EpubBook,
+    pub authors: Vec<Author>,
+    pub tags: Vec<Tag>,
+}
