@@ -2,7 +2,6 @@
 	import { onMount } from 'svelte';
 	import type { EpubBook, SearchQuery, ViewMode } from '$lib/types/epub';
 	import { EpubService } from '$lib/services/epub';
-	import { currentWorkspace } from '$lib/stores/workspace';
 	import BookGrid from './BookGrid.svelte';
 	import BookList from './BookList.svelte';
 	import BookDetailList from './BookDetailList.svelte';
@@ -77,7 +76,6 @@
 	 */
 	function handleImport(): void {
 		// TODO: Open import dialog (implement in next phase)
-		console.log('Import button clicked');
 	}
 
 	onMount(() => {
