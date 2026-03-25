@@ -26,71 +26,70 @@ pub async fn import_epub(
 
     // Step 3: 提取元数据
     let metadata = parser.extract_metadata()?;
+    let file_size = std::fs::metadata(source_path)?.len() as i64;
 
-    // Step 4: 创建数据库记录（先创建以获取 book_id，file_path 临时为空）
+    // Step 4: 使用临时 ID 进行文件操作（使用时间戳作为临时 ID）
+    let storage = EpubStorage::new(&workspace_path);
+    storage.ensure_epub_root()?;
+
+    let temp_id = Utc::now().timestamp();
+    let dest_path = storage.copy_epub_file(source_path, temp_id)?;
+
+    // Step 5: 保存封面（如果有）
+    let cover_path_option = match parser.extract_cover() {
+        Ok(Some(cover_data)) => {
+            storage.save_cover(&cover_data, temp_id)?;
+            Some(storage.cover_path(temp_id).to_string_lossy().to_string())
+        }
+        Ok(None) => None,
+        Err(e) => {
+            eprintln!("Warning: Failed to extract cover: {}", e);
+            None
+        }
+    };
+
+    // Step 6: 创建数据库记录（现在有完整路径）
     let db = EpubDatabase::new(pool.inner().clone());
+    let now = Utc::now().to_rfc3339();
 
     let book = EpubBook {
         id: 0, // 将被数据库自动分配
         title: metadata.title.unwrap_or_else(|| "Unknown Title".to_string()),
         sort_title: None,
-        isbn: metadata.isbn,
-        publisher: metadata.publisher,
-        pubdate: metadata.pubdate,
-        language: metadata.language,
+        isbn: metadata.isbn.clone(),
+        publisher: metadata.publisher.clone(),
+        pubdate: metadata.pubdate.clone(),
+        language: metadata.language.clone(),
         series: None,
         series_index: None,
         rating: None,
-        file_path: String::new(), // 临时为空，后续更新
-        file_size: std::fs::metadata(source_path)?.len() as i64,
-        cover_path: None,
-        description: metadata.description,
-        created_at: Utc::now().to_rfc3339(),
-        updated_at: Utc::now().to_rfc3339(),
+        file_path: dest_path.to_string_lossy().to_string(),
+        file_size,
+        cover_path: cover_path_option.clone(),
+        description: metadata.description.clone(),
+        created_at: now.clone(),
+        updated_at: now,
     };
 
     let book_id = db.create_book(&book).await?;
 
-    // Step 5: 复制 EPUB 文件到书库
-    let storage = EpubStorage::new(&workspace_path);
-    storage.ensure_epub_root()?;
-    let dest_path = storage.copy_epub_file(source_path, book_id)?;
+    // Step 7: 重命名文件（从 temp_id 到 book_id）
+    let final_book_dir = storage.book_dir(book_id);
+    let temp_book_dir = storage.book_dir(temp_id);
+    std::fs::rename(&temp_book_dir, &final_book_dir)?;
 
-    // Step 6: 保存封面图片
-    if let Ok(Some(cover_data)) = parser.extract_cover() {
-        storage.save_cover(&cover_data, book_id)?;
-    }
-
-    // Step 7: 更新数据库中的文件路径和封面路径
-    let file_path_str = dest_path.to_string_lossy().to_string();
-    let cover_path_str = if storage.cover_path(book_id).exists() {
+    // Step 8: 更新数据库路径
+    let final_file_path = storage.epub_file_path(book_id).to_string_lossy().to_string();
+    let final_cover_path = if cover_path_option.is_some() {
         Some(storage.cover_path(book_id).to_string_lossy().to_string())
     } else {
         None
     };
 
-    let updated_book = EpubBook {
-        id: book_id,
-        title: book.title,
-        sort_title: book.sort_title,
-        isbn: book.isbn,
-        publisher: book.publisher,
-        pubdate: book.pubdate,
-        language: book.language,
-        series: book.series,
-        series_index: book.series_index,
-        rating: book.rating,
-        file_path: file_path_str,
-        file_size: book.file_size,
-        cover_path: cover_path_str,
-        description: book.description,
-        created_at: book.created_at,
-        updated_at: Utc::now().to_rfc3339(),
-    };
-
+    let updated_book = book.with_storage_paths(final_file_path, final_cover_path);
     db.update_book(book_id, &updated_book).await?;
 
-    // Step 8: 设置作者关联
+    // Step 9: 设置作者关联
     if !metadata.authors.is_empty() {
         let authors: Vec<(String, Option<String>, i32)> = metadata
             .authors
@@ -131,7 +130,9 @@ pub async fn batch_import_epub(
             file_name: file_name.clone(),
         };
 
-        let _ = window.emit("epub-import-progress", &progress);
+        if let Err(e) = window.emit("epub-import-progress", &progress) {
+            eprintln!("Warning: Failed to emit progress event: {}", e);
+        }
 
         // 尝试导入
         match import_epub(pool.clone(), workspace_path.clone(), file_path.clone()).await {

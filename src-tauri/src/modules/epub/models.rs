@@ -181,3 +181,15 @@ pub struct EpubBookWithDetails {
     pub authors: Vec<Author>,
     pub tags: Vec<Tag>,
 }
+
+impl EpubBook {
+    /// 创建新实例并更新存储路径（不可变更新）
+    pub fn with_storage_paths(self, file_path: String, cover_path: Option<String>) -> Self {
+        Self {
+            file_path,
+            cover_path,
+            updated_at: chrono::Utc::now().to_rfc3339(),
+            ..self
+        }
+    }
+}
