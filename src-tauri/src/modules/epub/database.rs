@@ -182,7 +182,7 @@ impl EpubDatabase {
     pub async fn set_book_authors(
         &self,
         book_id: i64,
-        authors: Vec<(String, Option<String>)>,
+        authors: Vec<(String, Option<String>, i32)>,
     ) -> AppResult<()> {
         // 开始事务
         let mut tx = self.pool.begin().await?;
@@ -194,7 +194,7 @@ impl EpubDatabase {
             .await?;
 
         // 添加新关联
-        for (order, (name, sort_name)) in authors.iter().enumerate() {
+        for (name, sort_name, order) in authors.iter() {
             let author_id = self
                 .get_or_create_author(name, sort_name.as_deref())
                 .await?;
@@ -204,7 +204,7 @@ impl EpubDatabase {
             )
             .bind(book_id)
             .bind(author_id)
-            .bind(order as i32)
+            .bind(order)
             .execute(&mut *tx)
             .await?;
         }
