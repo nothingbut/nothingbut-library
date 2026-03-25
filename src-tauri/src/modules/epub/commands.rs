@@ -312,6 +312,42 @@ pub async fn set_epub_book_tags(
     Ok(())
 }
 
+/// 更新书籍封面
+#[tauri::command]
+pub async fn update_epub_cover(
+    pool: State<'_, SqlitePool>,
+    workspace_path: String,
+    book_id: i64,
+    cover_file_path: String,
+) -> AppResult<()> {
+    let storage = EpubStorage::new(&workspace_path);
+    let db = EpubDatabase::new(pool.inner().clone());
+
+    // Step 1: 验证书籍存在
+    let mut book = db.get_book(book_id).await?.ok_or_else(|| {
+        crate::AppError::NotFound(format!("Book {} not found", book_id))
+    })?;
+
+    // Step 2: 读取新封面文件
+    let cover_data = std::fs::read(&cover_file_path).map_err(|e| {
+        crate::AppError::Io(format!("Failed to read cover file {}: {}", cover_file_path, e))
+    })?;
+
+    // Step 3: 保存新封面（覆盖现有）
+    storage.save_cover(&cover_data, book_id)?;
+
+    // Step 4: 获取新的封面路径
+    let new_cover_path = storage.cover_path(book_id).to_string_lossy().to_string();
+
+    // Step 5: 更新数据库记录
+    book.cover_path = Some(new_cover_path);
+    book.updated_at = Utc::now().to_rfc3339();
+
+    db.update_book(book_id, &book).await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

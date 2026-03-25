@@ -120,6 +120,7 @@ pub fn run() {
             modules::epub::commands::update_epub_metadata,
             modules::epub::commands::set_epub_book_authors,
             modules::epub::commands::set_epub_book_tags,
+            modules::epub::commands::update_epub_cover,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
