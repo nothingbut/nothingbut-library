@@ -4,6 +4,7 @@
 	import type { EpubBook, EpubBookWithDetails } from '$lib/types/epub';
 	import { EpubService } from '$lib/services/epub';
 	import { currentWorkspace } from '$lib/stores/workspace';
+	import MetadataEditor from './MetadataEditor.svelte';
 
 	interface Props {
 		book: EpubBook;
@@ -134,6 +135,28 @@
 	function handleStartReading(): void {
 		// TODO: Implement reading functionality (Week 4)
 		console.log('Start reading:', book.id);
+	}
+
+	/**
+	 * Handle save metadata action
+	 */
+	async function handleSaveMetadata(updatedData: any): Promise<void> {
+		try {
+			// TODO: Call save API (placeholder for now)
+			// await EpubService.updateBook(updatedData.book, updatedData.authors, updatedData.tags);
+			console.log('Saving metadata:', updatedData);
+
+			// Reload book details
+			await loadBookDetails();
+
+			// Exit edit mode
+			editMode = false;
+		} catch (err) {
+			const message = err instanceof Error ? err.message : '保存失败';
+			error = `保存失败: ${message}`;
+			console.error('Failed to save metadata:', err);
+			throw err;
+		}
 	}
 
 	onMount(() => {
@@ -302,38 +325,41 @@
 
 	<!-- Footer buttons -->
 	<div class="space-y-2 border-t border-gray-200 px-6 py-4">
-		<!-- Start reading button -->
-		<button
-			onclick={handleStartReading}
-			class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition-colors"
-			disabled={loading || !bookDetails}
-		>
-			开始阅读
-		</button>
+		{#if editMode && bookDetails}
+			<MetadataEditor
+				book={bookDetails.book}
+				authors={bookDetails.authors}
+				tags={bookDetails.tags}
+				onSave={handleSaveMetadata}
+				onCancel={() => (editMode = false)}
+			/>
+		{:else}
+			<!-- Start reading button -->
+			<button
+				onclick={handleStartReading}
+				class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition-colors"
+				disabled={loading || !bookDetails}
+			>
+				开始阅读
+			</button>
 
-		<!-- Edit button -->
-		<button
-			onclick={() => (editMode = !editMode)}
-			class="w-full rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-900 hover:bg-gray-200 transition-colors"
-			disabled={loading || !bookDetails}
-		>
-			{editMode ? '取消编辑' : '编辑'}
-		</button>
+			<!-- Edit button -->
+			<button
+				onclick={() => (editMode = !editMode)}
+				class="w-full rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-900 hover:bg-gray-200 transition-colors"
+				disabled={loading || !bookDetails}
+			>
+				{editMode ? '取消编辑' : '编辑'}
+			</button>
 
-		<!-- Delete button -->
-		<button
-			onclick={handleDelete}
-			class="w-full rounded-lg border border-red-600 px-4 py-2 font-medium text-red-600 hover:bg-red-50 transition-colors"
-			disabled={loading}
-		>
-			删除书籍
-		</button>
-
-		<!-- Edit mode placeholder -->
-		{#if editMode}
-			<div class="mt-2 rounded-md bg-yellow-50 p-3">
-				<p class="text-sm text-yellow-800">编辑模式（Week 3 实现）</p>
-			</div>
+			<!-- Delete button -->
+			<button
+				onclick={handleDelete}
+				class="w-full rounded-lg border border-red-600 px-4 py-2 font-medium text-red-600 hover:bg-red-50 transition-colors"
+				disabled={loading}
+			>
+				删除书籍
+			</button>
 		{/if}
 	</div>
 </div>
