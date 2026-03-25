@@ -40,12 +40,22 @@
    * Convert rating number (0-5) to star representation
    */
   function getRatingStars(rating: number | null): string {
-    if (!rating || rating < 0 || rating > 5) {
+    if (rating === null || rating === undefined || rating < 0 || rating > 5) {
       return '';
     }
     const filledStars = Math.round(rating);
     const emptyStars = 5 - filledStars;
     return '★'.repeat(filledStars) + '☆'.repeat(emptyStars);
+  }
+
+  /**
+   * Handle image loading errors by falling back to placeholder
+   */
+  function handleImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (img.src !== '/placeholder-cover.svg') {
+      img.src = '/placeholder-cover.svg';
+    }
   }
 </script>
 
@@ -62,6 +72,7 @@
           src={getCoverUrl(book)}
           alt={book.title}
           class="h-full w-full object-cover transition group-hover:scale-105"
+          onerror={handleImageError}
         />
       </div>
 
