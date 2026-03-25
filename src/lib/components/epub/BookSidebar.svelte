@@ -3,6 +3,7 @@
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import type { EpubBook, EpubBookWithDetails } from '$lib/types/epub';
 	import { EpubService } from '$lib/services/epub';
+	import { currentWorkspace } from '$lib/stores/workspace';
 
 	interface Props {
 		book: EpubBook;
@@ -68,23 +69,12 @@
 	 * Returns "未评分" if no rating
 	 */
 	function getRatingStars(rating: number | null): string {
-		if (rating === null || rating === undefined || rating < 0 || rating > 5) {
+		if (rating === null || rating < 0 || rating > 5) {
 			return '未评分';
 		}
 		const filledStars = Math.round(rating);
 		const emptyStars = 5 - filledStars;
 		return '★'.repeat(filledStars) + '☆'.repeat(emptyStars);
-	}
-
-	/**
-	 * Format file size from bytes to human-readable format
-	 */
-	function formatFileSize(bytes: number): string {
-		if (bytes === 0) return '0 B';
-		const k = 1024;
-		const sizes = ['B', 'KB', 'MB', 'GB'];
-		const i = Math.floor(Math.log(bytes) / Math.log(k));
-		return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 	}
 
 	/**
@@ -108,7 +98,7 @@
 			});
 		} catch (e) {
 			console.warn(`Failed to format date ${dateStr}:`, e);
-			return dateStr;
+			return '日期格式错误';
 		}
 	}
 
@@ -121,11 +111,15 @@
 			return;
 		}
 
+		// Validate workspace is selected
+		const workspace = $currentWorkspace;
+		if (!workspace) {
+			error = '未选择工作空间';
+			return;
+		}
+
 		try {
-			// TODO: workspacePath should come from workspace context/store
-			// For now, use empty string as placeholder
-			const workspacePath = '';
-			await EpubService.deleteBook(workspacePath, book.id);
+			await EpubService.deleteBook(workspace.path, book.id);
 			onDeleted();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : '删除失败';
