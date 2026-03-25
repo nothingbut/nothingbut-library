@@ -44,23 +44,45 @@ impl EpubParser {
 
     /// 提取元数据
     pub fn extract_metadata(&self) -> AppResult<EpubMetadata> {
-        // 每次单独借用，使用后立即释放，避免与辅助方法的借用冲突
-        let title = self.doc.borrow_mut().mdata("title").map(|m| m.value.clone());
-        let publisher = self.doc.borrow_mut().mdata("publisher").map(|m| m.value.clone());
-        let pubdate = self.doc.borrow_mut().mdata("date").map(|m| m.value.clone());
-        let language = self.doc.borrow_mut().mdata("language").map(|m| m.value.clone());
-        let description = self.doc.borrow_mut().mdata("description").map(|m| m.value.clone());
+        let doc = self.doc.borrow_mut();
 
-        let metadata = EpubMetadata {
+        let title = doc.mdata("title").map(|m| m.value.clone());
+        let publisher = doc.mdata("publisher").map(|m| m.value.clone());
+        let pubdate = doc.mdata("date").map(|m| m.value.clone());
+        let language = doc.mdata("language").map(|m| m.value.clone());
+        let description = doc.mdata("description").map(|m| m.value.clone());
+
+        // 内联 extract_authors 逻辑
+        let authors = {
+            let mut authors = Vec::new();
+            if let Some(author) = doc.mdata("creator") {
+                authors.push(author.value.clone());
+            }
+            let mut i = 1;
+            while let Some(author) = doc.mdata(&format!("creator_{}", i)) {
+                authors.push(author.value.clone());
+                i += 1;
+            }
+            authors
+        };
+
+        // 内联 extract_isbn 逻辑
+        let isbn = doc.mdata("isbn")
+            .or_else(|| doc.mdata("identifier"))
+            .or_else(|| doc.mdata("ISBN"))
+            .map(|m| m.value.clone());
+
+        drop(doc); // 显式释放借用
+
+        Ok(EpubMetadata {
             title,
-            authors: self.extract_authors(),  // 现在安全，之前的借用已释放
+            authors,
             publisher,
             pubdate,
             language,
-            isbn: self.extract_isbn(),  // 现在安全
+            isbn,
             description,
-        };
-        Ok(metadata)
+        })
     }
 
     /// 提取封面图片
@@ -135,35 +157,6 @@ impl EpubParser {
         Ok(true)
     }
 
-    // Helper methods
-
-    fn extract_authors(&self) -> Vec<String> {
-        let doc = self.doc.borrow_mut();
-        let mut authors = Vec::new();
-
-        // EPUB 可能有多个作者
-        if let Some(author) = doc.mdata("creator") {
-            authors.push(author.value.clone());
-        }
-
-        // 尝试其他作者字段
-        let mut i = 1;
-        while let Some(author) = doc.mdata(&format!("creator_{}", i)) {
-            authors.push(author.value.clone());
-            i += 1;
-        }
-
-        authors
-    }
-
-    fn extract_isbn(&self) -> Option<String> {
-        let doc = self.doc.borrow_mut();
-        // 尝试多种 ISBN 字段
-        doc.mdata("isbn")
-            .or_else(|| doc.mdata("identifier"))
-            .or_else(|| doc.mdata("ISBN"))
-            .map(|m| m.value.clone())
-    }
 }
 
 #[cfg(test)]
