@@ -11,16 +11,21 @@
 	let showAdvanced = $state(false);
 
 	// 高级搜索字段
-	let advancedQuery = $state<SearchQuery>({
+	// Note: rating fields use empty string for "不限" (unlimited) in selects
+	let advancedQuery = $state({
 		title: '',
 		author: '',
 		publisher: '',
 		series: '',
-		rating_min: undefined,
-		rating_max: undefined,
+		rating_min: '' as string | number,
+		rating_max: '' as string | number,
 	});
 
+	let searchError = $state('');
+
 	function handleBasicSearch() {
+		showAdvanced = false;
+		searchError = '';
 		if (keyword.trim()) {
 			onSearch({ keyword: keyword.trim() });
 		} else {
@@ -29,27 +34,46 @@
 	}
 
 	function handleAdvancedSearch() {
+		searchError = '';
 		const query: SearchQuery = {};
 
-		if (advancedQuery.title) query.title = advancedQuery.title;
-		if (advancedQuery.author) query.author = advancedQuery.author;
-		if (advancedQuery.publisher) query.publisher = advancedQuery.publisher;
-		if (advancedQuery.series) query.series = advancedQuery.series;
-		if (advancedQuery.rating_min !== undefined) query.rating_min = advancedQuery.rating_min;
-		if (advancedQuery.rating_max !== undefined) query.rating_max = advancedQuery.rating_max;
+		// Trim and add text fields if non-empty
+		const title = advancedQuery.title?.trim() || '';
+		const author = advancedQuery.author?.trim() || '';
+		const publisher = advancedQuery.publisher?.trim() || '';
+		const series = advancedQuery.series?.trim() || '';
+
+		if (title) query.title = title;
+		if (author) query.author = author;
+		if (publisher) query.publisher = publisher;
+		if (series) query.series = series;
+
+		// Handle rating fields (empty string means "不限" / unlimited)
+		const ratingMin = advancedQuery.rating_min !== '' ? Number(advancedQuery.rating_min) : undefined;
+		const ratingMax = advancedQuery.rating_max !== '' ? Number(advancedQuery.rating_max) : undefined;
+
+		// Validate rating range: min <= max
+		if (ratingMin !== undefined && ratingMax !== undefined && ratingMin > ratingMax) {
+			searchError = '最低评分不能高于最高评分';
+			return;
+		}
+
+		if (ratingMin !== undefined) query.rating_min = ratingMin;
+		if (ratingMax !== undefined) query.rating_max = ratingMax;
 
 		onSearch(query);
 		showAdvanced = false;
 	}
 
 	function handleClearAdvanced() {
+		searchError = '';
 		advancedQuery = {
 			title: '',
 			author: '',
 			publisher: '',
 			series: '',
-			rating_min: undefined,
-			rating_max: undefined,
+			rating_min: '',
+			rating_max: '',
 		};
 		onSearch({});
 	}
@@ -86,6 +110,12 @@
 	{#if showAdvanced}
 		<div class="absolute left-0 right-0 top-full z-10 mt-2 rounded-lg border bg-white p-6 shadow-lg">
 			<h3 class="mb-4 text-lg font-semibold">高级搜索</h3>
+
+			{#if searchError}
+				<div class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 border border-red-200">
+					{searchError}
+				</div>
+			{/if}
 
 			<div class="grid grid-cols-2 gap-4">
 				<!-- 标题 -->
@@ -144,7 +174,7 @@
 						bind:value={advancedQuery.rating_min}
 						class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 					>
-						<option value={undefined}>不限</option>
+						<option value="">不限</option>
 						<option value={1}>1 星</option>
 						<option value={2}>2 星</option>
 						<option value={3}>3 星</option>
@@ -161,7 +191,7 @@
 						bind:value={advancedQuery.rating_max}
 						class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 					>
-						<option value={undefined}>不限</option>
+						<option value="">不限</option>
 						<option value={1}>1 星</option>
 						<option value={2}>2 星</option>
 						<option value={3}>3 星</option>
