@@ -142,11 +142,16 @@
 	 */
 	async function handleSaveMetadata(updatedData: any): Promise<void> {
 		try {
-			// TODO: Call save API (placeholder for now)
-			// await EpubService.updateBook(updatedData.book, updatedData.authors, updatedData.tags);
-			console.log('Saving metadata:', updatedData);
+			// Update book metadata
+			await EpubService.updateMetadata(book.id, updatedData.book);
 
-			// Reload book details
+			// Update authors
+			await EpubService.setAuthors(book.id, updatedData.authors);
+
+			// Update tags
+			await EpubService.setTags(book.id, updatedData.tags);
+
+			// Refresh data
 			await loadBookDetails();
 
 			// Exit edit mode

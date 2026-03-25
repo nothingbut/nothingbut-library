@@ -164,4 +164,98 @@ export class EpubService {
 			throw new Error(`Failed to delete book: ${message}`);
 		}
 	}
+
+	/**
+	 * 更新书籍元数据
+	 * @param bookId - 书籍 ID
+	 * @param metadata - 元数据字段（部分更新）
+	 * @throws Error if validation fails or update operation fails
+	 */
+	static async updateMetadata(
+		bookId: number,
+		metadata: Partial<EpubBook>
+	): Promise<void> {
+		try {
+			this.validatePositiveNumber(bookId, 'bookId');
+			if (!metadata || typeof metadata !== 'object') {
+				throw new Error('Invalid input: metadata must be a valid object');
+			}
+
+			// Ensure title is provided and non-empty
+			const title = metadata.title;
+			if (typeof title !== 'string' || title.trim() === '') {
+				throw new Error('Invalid input: title must be a non-empty string');
+			}
+
+			const updateRequest = {
+				title: title.trim(),
+				sort_title: metadata.sort_title ?? null,
+				isbn: metadata.isbn ?? null,
+				publisher: metadata.publisher ?? null,
+				pubdate: metadata.pubdate ?? null,
+				language: metadata.language ?? null,
+				series: metadata.series ?? null,
+				series_index: metadata.series_index ?? null,
+				rating: metadata.rating ?? null,
+				description: metadata.description ?? null,
+			};
+
+			await invoke('update_epub_metadata', { bookId, metadata: updateRequest });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Failed to update metadata';
+			throw new Error(`Failed to update metadata: ${message}`);
+		}
+	}
+
+	/**
+	 * 设置书籍的作者列表
+	 * @param bookId - 书籍 ID
+	 * @param authorNames - 作者名称数组
+	 * @throws Error if validation fails or operation fails
+	 */
+	static async setAuthors(bookId: number, authorNames: string[]): Promise<void> {
+		try {
+			this.validatePositiveNumber(bookId, 'bookId');
+			this.validateNonEmptyArray<string>(authorNames, 'authorNames');
+
+			// Validate each author name
+			for (const name of authorNames) {
+				if (typeof name !== 'string' || name.trim() === '') {
+					throw new Error('Invalid input: each author name must be a non-empty string');
+				}
+			}
+
+			const sanitizedNames = authorNames.map((name) => name.trim());
+			await invoke('set_epub_book_authors', { bookId, authorNames: sanitizedNames });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Failed to set authors';
+			throw new Error(`Failed to set authors: ${message}`);
+		}
+	}
+
+	/**
+	 * 设置书籍的标签列表
+	 * @param bookId - 书籍 ID
+	 * @param tagNames - 标签名称数组
+	 * @throws Error if validation fails or operation fails
+	 */
+	static async setTags(bookId: number, tagNames: string[]): Promise<void> {
+		try {
+			this.validatePositiveNumber(bookId, 'bookId');
+			this.validateNonEmptyArray<string>(tagNames, 'tagNames');
+
+			// Validate each tag name
+			for (const name of tagNames) {
+				if (typeof name !== 'string' || name.trim() === '') {
+					throw new Error('Invalid input: each tag name must be a non-empty string');
+				}
+			}
+
+			const sanitizedNames = tagNames.map((name) => name.trim());
+			await invoke('set_epub_book_tags', { bookId, tagNames: sanitizedNames });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Failed to set tags';
+			throw new Error(`Failed to set tags: ${message}`);
+		}
+	}
 }

@@ -1,5 +1,9 @@
 <script lang="ts">
+	import { open } from '@tauri-apps/plugin-dialog';
+	import { convertFileSrc } from '@tauri-apps/api/core';
 	import type { EpubBook, Author, Tag } from '$lib/types/epub';
+	import { currentWorkspace } from '$lib/stores/workspace';
+	import { EpubService } from '$lib/services/epub';
 
 	interface Props {
 		book: EpubBook;
@@ -20,6 +24,41 @@
 	let saving: boolean = $state(false);
 	let newAuthor: string = $state('');
 	let newTag: string = $state('');
+	let coverFile: string | null = $state(null);
+
+	/**
+	 * Get the cover image URL with error handling
+	 */
+	function getCoverUrl(): string {
+		if (book.cover_path) {
+			try {
+				return convertFileSrc(book.cover_path);
+			} catch (e) {
+				console.warn('Failed to convert cover path:', e);
+				return '/placeholder-cover.svg';
+			}
+		}
+		return '/placeholder-cover.svg';
+	}
+
+	/**
+	 * Handle cover file selection
+	 */
+	async function handleCoverUpload(): Promise<void> {
+		const selected = await open({
+			multiple: false,
+			filters: [
+				{
+					name: 'Images',
+					extensions: ['jpg', 'jpeg', 'png', 'webp']
+				}
+			]
+		});
+
+		if (selected) {
+			coverFile = selected;
+		}
+	}
 
 	/**
 	 * Add an author if it's not a duplicate
@@ -83,6 +122,16 @@
 
 		saving = true;
 		try {
+			// Upload cover first if selected
+			if (coverFile) {
+				const workspace = $currentWorkspace;
+				if (!workspace) {
+					throw new Error('未选择工作空间');
+				}
+				await EpubService.updateCover(workspace.path, book.id, coverFile);
+			}
+
+			// Save metadata
 			await onSave({
 				book: editedBook,
 				authors: editedAuthors,
@@ -117,6 +166,33 @@
 
 <div class="space-y-4 rounded-lg bg-gray-50 p-4">
 	<h3 class="font-semibold text-gray-900">编辑书籍信息</h3>
+
+	<!-- Cover upload -->
+	<div>
+		<label class="mb-1 block text-sm font-medium text-gray-700">封面</label>
+		<div class="flex items-center gap-4">
+			<img
+				src={getCoverUrl()}
+				alt="Current cover"
+				class="h-32 w-24 rounded object-cover"
+			/>
+			<div class="flex-1">
+				<button
+					type="button"
+					class="rounded bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 disabled:bg-gray-400"
+					onclick={handleCoverUpload}
+					disabled={saving}
+				>
+					选择新封面
+				</button>
+				{#if coverFile}
+					<p class="mt-2 text-sm text-green-600">
+						已选择新封面
+					</p>
+				{/if}
+			</div>
+		</div>
+	</div>
 
 	<!-- Title (required) -->
 	<div>
