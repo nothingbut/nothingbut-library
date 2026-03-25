@@ -44,15 +44,21 @@ impl EpubParser {
 
     /// 提取元数据
     pub fn extract_metadata(&self) -> AppResult<EpubMetadata> {
-        let doc = self.doc.borrow_mut();
+        // 每次单独借用，使用后立即释放，避免与辅助方法的借用冲突
+        let title = self.doc.borrow_mut().mdata("title").map(|m| m.value.clone());
+        let publisher = self.doc.borrow_mut().mdata("publisher").map(|m| m.value.clone());
+        let pubdate = self.doc.borrow_mut().mdata("date").map(|m| m.value.clone());
+        let language = self.doc.borrow_mut().mdata("language").map(|m| m.value.clone());
+        let description = self.doc.borrow_mut().mdata("description").map(|m| m.value.clone());
+
         let metadata = EpubMetadata {
-            title: doc.mdata("title").map(|m| m.value.clone()),
-            authors: self.extract_authors(),
-            publisher: doc.mdata("publisher").map(|m| m.value.clone()),
-            pubdate: doc.mdata("date").map(|m| m.value.clone()),
-            language: doc.mdata("language").map(|m| m.value.clone()),
-            isbn: self.extract_isbn(),
-            description: doc.mdata("description").map(|m| m.value.clone()),
+            title,
+            authors: self.extract_authors(),  // 现在安全，之前的借用已释放
+            publisher,
+            pubdate,
+            language,
+            isbn: self.extract_isbn(),  // 现在安全
+            description,
         };
         Ok(metadata)
     }
@@ -216,6 +222,31 @@ mod tests {
             assert!(msg.contains(".epub extension"));
         } else {
             panic!("Expected InvalidInput error for wrong extension");
+        }
+    }
+
+    #[test]
+    fn test_extract_metadata_no_panic() {
+        // 测试 extract_metadata() 不会因为 RefCell 双重借用而 panic
+        // 即使文件无效，也应该返回错误而不是 panic
+        let temp_dir = TempDir::new().unwrap();
+        let epub_path = temp_dir.path().join("test.epub");
+
+        // 创建一个无效的 EPUB 文件
+        let mut file = fs::File::create(&epub_path).unwrap();
+        file.write_all(b"not a valid epub").unwrap();
+        drop(file);
+
+        // 尝试打开会失败，但不应该 panic
+        let result = EpubParser::open(&epub_path);
+        assert!(result.is_err());
+
+        // 验证错误类型
+        match result {
+            Err(AppError::InvalidInput(_)) => {
+                // 预期行为：返回错误而不是 panic
+            }
+            _ => panic!("Expected InvalidInput error for invalid EPUB"),
         }
     }
 
