@@ -2,17 +2,18 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use image::{imageops::FilterType, ImageFormat};
 use crate::errors::{AppError, AppResult};
-use super::models::EpubMetadata;
 
 /// EPUB 存储管理器
-pub struct EpubStorageManager {
+pub struct EpubStorage {
     workspace_path: PathBuf,
 }
 
-impl EpubStorageManager {
+impl EpubStorage {
     /// 创建新的存储管理器
-    pub fn new(workspace_path: PathBuf) -> Self {
-        Self { workspace_path }
+    pub fn new(workspace_path: impl AsRef<Path>) -> Self {
+        Self {
+            workspace_path: workspace_path.as_ref().to_path_buf(),
+        }
     }
 
     /// 获取 EPUB 根目录
@@ -22,7 +23,7 @@ impl EpubStorageManager {
 
     /// 获取书籍目录
     pub fn book_dir(&self, book_id: i64) -> PathBuf {
-        self.epub_root().join(format!("book-{}", book_id))
+        self.epub_root().join("books").join(book_id.to_string())
     }
 
     /// 确保 EPUB 根目录存在
@@ -46,7 +47,7 @@ impl EpubStorageManager {
     }
 
     /// 复制 EPUB 文件到书库
-    pub fn copy_epub_file(&self, source_path: &Path, book_id: i64) -> AppResult<String> {
+    pub fn copy_epub_file(&self, source_path: &Path, book_id: i64) -> AppResult<PathBuf> {
         // 确保源文件存在
         if !source_path.exists() {
             return Err(AppError::NotFound(format!(
@@ -58,28 +59,25 @@ impl EpubStorageManager {
         // 创建书籍目录
         let book_dir = self.create_book_dir(book_id)?;
 
-        // 目标文件路径
-        let file_name = source_path
-            .file_name()
-            .ok_or_else(|| AppError::InvalidInput("Invalid file path".to_string()))?;
-        let dest_path = book_dir.join(file_name);
+        // 目标文件路径（始终命名为 book.epub）
+        let dest_path = book_dir.join("book.epub");
 
         // 复制文件
         fs::copy(source_path, &dest_path).map_err(|e| {
             AppError::Io(format!("Failed to copy EPUB file: {}", e))
         })?;
 
-        // 返回相对路径
-        Ok(format!("epub/book-{}/{}", book_id, file_name.to_string_lossy()))
+        // 返回目标文件路径
+        Ok(dest_path)
     }
 
     /// 获取 EPUB 文件路径
     pub fn epub_file_path(&self, book_id: i64) -> PathBuf {
-        self.book_dir(book_id)
+        self.book_dir(book_id).join("book.epub")
     }
 
     /// 保存封面图片（生成两个尺寸）
-    pub fn save_cover(&self, cover_data: &[u8], book_id: i64) -> AppResult<(String, String)> {
+    pub fn save_cover(&self, cover_data: &[u8], book_id: i64) -> AppResult<()> {
         // 创建书籍目录
         let book_dir = self.create_book_dir(book_id)?;
 
@@ -88,25 +86,21 @@ impl EpubStorageManager {
             AppError::InvalidInput(format!("Failed to load cover image: {}", e))
         })?;
 
-        // 生成大封面 (600x800)
-        let large_cover = img.resize_exact(600, 800, FilterType::Lanczos3);
+        // 生成大封面 (600x800, 保持纵横比)
+        let large_cover = img.resize(600, 800, FilterType::Lanczos3);
         let large_path = book_dir.join("cover.jpg");
         large_cover
             .save_with_format(&large_path, ImageFormat::Jpeg)
             .map_err(|e| AppError::Io(format!("Failed to save large cover: {}", e)))?;
 
-        // 生成缩略图 (200x267)
-        let thumb_cover = img.resize_exact(200, 267, FilterType::Lanczos3);
+        // 生成缩略图 (200x267, 保持纵横比)
+        let thumb_cover = img.resize(200, 267, FilterType::Lanczos3);
         let thumb_path = book_dir.join("cover_thumb.jpg");
         thumb_cover
             .save_with_format(&thumb_path, ImageFormat::Jpeg)
             .map_err(|e| AppError::Io(format!("Failed to save thumbnail cover: {}", e)))?;
 
-        // 返回相对路径
-        let large_rel = format!("epub/book-{}/cover.jpg", book_id);
-        let thumb_rel = format!("epub/book-{}/cover_thumb.jpg", book_id);
-
-        Ok((large_rel, thumb_rel))
+        Ok(())
     }
 
     /// 获取大封面路径
@@ -120,25 +114,15 @@ impl EpubStorageManager {
     }
 
     /// 保存元数据 JSON 备份
-    pub fn save_metadata_json(&self, book_id: i64, metadata: &EpubMetadata) -> AppResult<()> {
+    pub fn save_metadata_json(&self, book_id: i64, metadata: &serde_json::Value) -> AppResult<()> {
         let book_dir = self.book_dir(book_id);
         let metadata_path = book_dir.join("metadata.json");
 
-        // 序列化元数据（手动构建 JSON，因为 EpubMetadata 没有 Serialize trait）
-        let json = serde_json::json!({
-            "title": metadata.title,
-            "authors": metadata.authors,
-            "publisher": metadata.publisher,
-            "pubdate": metadata.pubdate,
-            "language": metadata.language,
-            "isbn": metadata.isbn,
-            "description": metadata.description,
-        });
+        let json_str = serde_json::to_string_pretty(metadata)
+            .map_err(|e| AppError::Json(format!("Failed to serialize metadata: {}", e)))?;
 
-        let json_str = serde_json::to_string_pretty(&json)?;
-        fs::write(&metadata_path, json_str).map_err(|e| {
-            AppError::Io(format!("Failed to save metadata JSON: {}", e))
-        })?;
+        fs::write(&metadata_path, json_str)
+            .map_err(|e| AppError::Io(format!("Failed to write metadata: {}", e)))?;
 
         Ok(())
     }
@@ -165,7 +149,7 @@ mod tests {
     #[test]
     fn test_epub_root() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         let epub_root = manager.epub_root();
         assert_eq!(epub_root, temp_dir.path().join("epub"));
@@ -174,16 +158,16 @@ mod tests {
     #[test]
     fn test_book_dir() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         let book_dir = manager.book_dir(123);
-        assert_eq!(book_dir, temp_dir.path().join("epub/book-123"));
+        assert_eq!(book_dir, temp_dir.path().join("epub/books/123"));
     }
 
     #[test]
     fn test_ensure_epub_root() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         manager.ensure_epub_root().unwrap();
         assert!(manager.epub_root().exists());
@@ -192,28 +176,29 @@ mod tests {
     #[test]
     fn test_create_book_dir() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         let book_dir = manager.create_book_dir(456).unwrap();
         assert!(book_dir.exists());
-        assert_eq!(book_dir, temp_dir.path().join("epub/book-456"));
+        assert_eq!(book_dir, temp_dir.path().join("epub/books/456"));
     }
 
     #[test]
     fn test_copy_epub_file() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         // 创建临时 EPUB 文件
         let source_file = temp_dir.path().join("test.epub");
         fs::write(&source_file, b"fake epub content").unwrap();
 
         // 复制文件
-        let relative_path = manager.copy_epub_file(&source_file, 789).unwrap();
-        assert_eq!(relative_path, "epub/book-789/test.epub");
+        let dest_path = manager.copy_epub_file(&source_file, 789).unwrap();
 
-        // 验证文件存在
-        let dest_path = manager.book_dir(789).join("test.epub");
+        // 验证返回的是目标文件路径
+        assert_eq!(dest_path, manager.book_dir(789).join("book.epub"));
+
+        // 验证文件存在且内容正确
         assert!(dest_path.exists());
         let content = fs::read_to_string(&dest_path).unwrap();
         assert_eq!(content, "fake epub content");
@@ -222,7 +207,7 @@ mod tests {
     #[test]
     fn test_copy_nonexistent_file() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         let result = manager.copy_epub_file(Path::new("/nonexistent/file.epub"), 999);
         assert!(result.is_err());
@@ -238,7 +223,7 @@ mod tests {
     #[test]
     fn test_save_cover() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         // 创建一个简单的 1x1 像素图片
         let img = image::RgbImage::from_pixel(1, 1, image::Rgb([255, 0, 0]));
@@ -247,11 +232,7 @@ mod tests {
             .unwrap();
 
         // 保存封面
-        let (large_path, thumb_path) = manager.save_cover(&cover_data, 101).unwrap();
-
-        // 验证返回路径
-        assert_eq!(large_path, "epub/book-101/cover.jpg");
-        assert_eq!(thumb_path, "epub/book-101/cover_thumb.jpg");
+        manager.save_cover(&cover_data, 101).unwrap();
 
         // 验证文件存在
         assert!(manager.cover_path(101).exists());
@@ -261,7 +242,7 @@ mod tests {
     #[test]
     fn test_save_invalid_cover() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         let invalid_data = b"not an image";
         let result = manager.save_cover(invalid_data, 102);
@@ -278,19 +259,19 @@ mod tests {
     #[test]
     fn test_save_metadata_json() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         manager.create_book_dir(201).unwrap();
 
-        let metadata = EpubMetadata {
-            title: Some("Test Book".to_string()),
-            authors: vec!["Author One".to_string(), "Author Two".to_string()],
-            publisher: Some("Test Publisher".to_string()),
-            pubdate: Some("2025-01-01".to_string()),
-            language: Some("en".to_string()),
-            isbn: Some("1234567890".to_string()),
-            description: Some("A test book".to_string()),
-        };
+        let metadata = serde_json::json!({
+            "title": "Test Book",
+            "authors": ["Author One", "Author Two"],
+            "publisher": "Test Publisher",
+            "pubdate": "2025-01-01",
+            "language": "en",
+            "isbn": "1234567890",
+            "description": "A test book",
+        });
 
         manager.save_metadata_json(201, &metadata).unwrap();
 
@@ -310,7 +291,7 @@ mod tests {
     #[test]
     fn test_delete_book() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         // 创建书籍目录和文件
         manager.create_book_dir(301).unwrap();
@@ -329,7 +310,7 @@ mod tests {
     #[test]
     fn test_delete_nonexistent_book() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         // 删除不存在的书籍应该成功（幂等）
         let result = manager.delete_book(999);
@@ -339,15 +320,24 @@ mod tests {
     #[test]
     fn test_cover_paths() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = EpubStorageManager::new(temp_dir.path().to_path_buf());
+        let manager = EpubStorage::new(temp_dir.path());
 
         let cover_path = manager.cover_path(401);
         let thumb_path = manager.cover_thumb_path(401);
 
-        assert_eq!(cover_path, temp_dir.path().join("epub/book-401/cover.jpg"));
+        assert_eq!(cover_path, temp_dir.path().join("epub/books/401/cover.jpg"));
         assert_eq!(
             thumb_path,
-            temp_dir.path().join("epub/book-401/cover_thumb.jpg")
+            temp_dir.path().join("epub/books/401/cover_thumb.jpg")
         );
+    }
+
+    #[test]
+    fn test_epub_file_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = EpubStorage::new(temp_dir.path());
+
+        let epub_path = manager.epub_file_path(501);
+        assert_eq!(epub_path, temp_dir.path().join("epub/books/501/book.epub"));
     }
 }
