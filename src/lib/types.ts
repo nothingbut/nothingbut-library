@@ -41,3 +41,6 @@ export interface Chapter {
 	word_count: number;
 	created_at: string;
 }
+
+// EPUB Library types
+export * from './types/epub';
