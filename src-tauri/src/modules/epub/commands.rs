@@ -6,9 +6,25 @@ use crate::modules::epub::models::{
 use crate::modules::epub::parser::EpubParser;
 use crate::modules::epub::storage::EpubStorage;
 use chrono::Utc;
+use serde::Deserialize;
 use sqlx::SqlitePool;
 use std::path::Path;
 use tauri::{Emitter, State, Window};
+
+/// 元数据更新请求
+#[derive(Debug, Deserialize)]
+pub struct UpdateMetadataRequest {
+    pub title: String,
+    pub sort_title: Option<String>,
+    pub isbn: Option<String>,
+    pub publisher: Option<String>,
+    pub pubdate: Option<String>,
+    pub language: Option<String>,
+    pub series: Option<String>,
+    pub series_index: Option<f32>,
+    pub rating: Option<i32>,
+    pub description: Option<String>,
+}
 
 /// 导入单个 EPUB 文件
 #[tauri::command]
@@ -210,6 +226,88 @@ pub async fn delete_epub_book(
 
     // Step 2: 删除数据库记录（级联删除关联）
     db.delete_book(book_id).await?;
+
+    Ok(())
+}
+
+/// 更新书籍元数据
+#[tauri::command]
+pub async fn update_epub_metadata(
+    pool: State<'_, SqlitePool>,
+    book_id: i64,
+    metadata: UpdateMetadataRequest,
+) -> AppResult<()> {
+    let db = EpubDatabase::new(pool.inner().clone());
+
+    // Step 1: 获取现有书籍
+    let existing_book = db.get_book(book_id).await?;
+    let mut book = existing_book.ok_or_else(|| {
+        crate::AppError::NotFound(format!("Book {} not found", book_id))
+    })?;
+
+    // Step 2: 更新字段
+    book.title = metadata.title;
+    book.sort_title = metadata.sort_title;
+    book.isbn = metadata.isbn;
+    book.publisher = metadata.publisher;
+    book.pubdate = metadata.pubdate;
+    book.language = metadata.language;
+    book.series = metadata.series;
+    book.series_index = metadata.series_index;
+    book.rating = metadata.rating;
+    book.description = metadata.description;
+
+    // Step 3: 保存到数据库
+    db.update_book(book_id, &book).await?;
+
+    Ok(())
+}
+
+/// 设置书籍的作者列表
+#[tauri::command]
+pub async fn set_epub_book_authors(
+    pool: State<'_, SqlitePool>,
+    book_id: i64,
+    author_names: Vec<String>,
+) -> AppResult<()> {
+    let db = EpubDatabase::new(pool.inner().clone());
+
+    // 验证书籍存在
+    let _book = db.get_book(book_id).await?;
+    if _book.is_none() {
+        return Err(crate::AppError::NotFound(format!("Book {} not found", book_id)));
+    }
+
+    // 转换作者名称为 (String, Option<String>, i32) 元组，带上顺序
+    let authors: Vec<(String, Option<String>, i32)> = author_names
+        .into_iter()
+        .enumerate()
+        .map(|(i, name)| (name, None, i as i32))
+        .collect();
+
+    // 设置作者关联
+    db.set_book_authors(book_id, authors).await?;
+
+    Ok(())
+}
+
+/// 设置书籍的标签列表
+#[tauri::command]
+pub async fn set_epub_book_tags(
+    pool: State<'_, SqlitePool>,
+    book_id: i64,
+    tag_names: Vec<String>,
+) -> AppResult<()> {
+    let db = EpubDatabase::new(pool.inner().clone());
+
+    // 验证书籍存在
+    let _book = db.get_book(book_id).await?;
+    if _book.is_none() {
+        return Err(crate::AppError::NotFound(format!("Book {} not found", book_id)));
+    }
+
+    // 设置标签关联
+    db.set_book_tags(book_id, tag_names).await?;
 
     Ok(())
 }

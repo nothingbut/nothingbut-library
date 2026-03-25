@@ -117,6 +117,9 @@ pub fn run() {
             modules::epub::commands::list_epub_books,
             modules::epub::commands::search_epub_books,
             modules::epub::commands::delete_epub_book,
+            modules::epub::commands::update_epub_metadata,
+            modules::epub::commands::set_epub_book_authors,
+            modules::epub::commands::set_epub_book_tags,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
