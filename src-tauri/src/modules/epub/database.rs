@@ -193,11 +193,30 @@ impl EpubDatabase {
             .execute(&mut *tx)
             .await?;
 
-        // 添加新关联
+        // 添加新关联（内联 get_or_create 逻辑以保持事务原子性）
         for (name, sort_name, order) in authors.iter() {
-            let author_id = self
-                .get_or_create_author(name, sort_name.as_deref())
-                .await?;
+            // 先尝试查找作者（在事务中）
+            let author_id = match sqlx::query_scalar::<_, i64>(
+                "SELECT id FROM epub_authors WHERE name = ?"
+            )
+            .bind(name)
+            .fetch_optional(&mut *tx)
+            .await? {
+                Some(id) => id,
+                None => {
+                    // 不存在则创建（在事务中）
+                    let timestamp = Utc::now().timestamp();
+                    sqlx::query(
+                        "INSERT INTO epub_authors (name, sort_name, created_at) VALUES (?, ?, ?)"
+                    )
+                    .bind(name)
+                    .bind(sort_name)
+                    .bind(timestamp)
+                    .execute(&mut *tx)
+                    .await?
+                    .last_insert_rowid()
+                }
+            };
 
             sqlx::query(
                 "INSERT INTO epub_book_authors (book_id, author_id, author_order) VALUES (?, ?, ?)",
@@ -274,9 +293,29 @@ impl EpubDatabase {
             .execute(&mut *tx)
             .await?;
 
-        // 添加新关联
+        // 添加新关联（内联 get_or_create 逻辑以保持事务原子性）
         for name in tag_names {
-            let tag_id = self.get_or_create_tag(&name).await?;
+            // 先尝试查找标签（在事务中）
+            let tag_id = match sqlx::query_scalar::<_, i64>(
+                "SELECT id FROM epub_tags WHERE name = ?"
+            )
+            .bind(&name)
+            .fetch_optional(&mut *tx)
+            .await? {
+                Some(id) => id,
+                None => {
+                    // 不存在则创建（在事务中）
+                    let timestamp = Utc::now().timestamp();
+                    sqlx::query(
+                        "INSERT INTO epub_tags (name, created_at) VALUES (?, ?)"
+                    )
+                    .bind(&name)
+                    .bind(timestamp)
+                    .execute(&mut *tx)
+                    .await?
+                    .last_insert_rowid()
+                }
+            };
 
             sqlx::query("INSERT INTO epub_book_tags (book_id, tag_id) VALUES (?, ?)")
                 .bind(book_id)
@@ -371,8 +410,13 @@ impl EpubDatabase {
         if query.series.is_some() {
             conditions.push("b.series LIKE '%' || ? || '%'".to_string());
         }
-        if has_tag_filter && query.tags.is_some() {
-            conditions.push("t.name IN (?)".to_string());
+        if has_tag_filter {
+            if let Some(ref tags) = query.tags {
+                if !tags.is_empty() {
+                    let placeholders = tags.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+                    conditions.push(format!("t.name IN ({})", placeholders));
+                }
+            }
         }
         if query.rating_min.is_some() {
             conditions.push("b.rating >= ?".to_string());
@@ -408,12 +452,12 @@ impl EpubDatabase {
 
         sql.push_str(&format!(" ORDER BY b.{} {}", sort_field, sort_direction));
 
-        // 添加分页
-        if let Some(limit) = query.limit {
-            sql.push_str(&format!(" LIMIT {}", limit));
+        // 添加分页（使用参数化查询防止 SQL 注入）
+        if query.limit.is_some() {
+            sql.push_str(" LIMIT ?");
         }
-        if let Some(offset) = query.offset {
-            sql.push_str(&format!(" OFFSET {}", offset));
+        if query.offset.is_some() {
+            sql.push_str(" OFFSET ?");
         }
 
         // 绑定参数
@@ -440,9 +484,10 @@ impl EpubDatabase {
         }
         if let Some(ref tags) = query.tags {
             if !tags.is_empty() {
-                // SQLite 不直接支持数组绑定，需要特殊处理
-                // 这里简化处理：只取第一个标签
-                query_builder = query_builder.bind(&tags[0]);
+                // 绑定所有标签
+                for tag in tags {
+                    query_builder = query_builder.bind(tag);
+                }
             }
         }
         if let Some(rating_min) = query.rating_min {
@@ -450,6 +495,12 @@ impl EpubDatabase {
         }
         if let Some(rating_max) = query.rating_max {
             query_builder = query_builder.bind(rating_max);
+        }
+        if let Some(limit) = query.limit {
+            query_builder = query_builder.bind(limit);
+        }
+        if let Some(offset) = query.offset {
+            query_builder = query_builder.bind(offset);
         }
 
         // 执行查询
