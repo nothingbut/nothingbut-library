@@ -17,8 +17,8 @@
 
   const modules: Module[] = [
     { id: 'novel', name: '网络小说', icon: '📚', available: true },
+    { id: 'epub', name: '电子书', icon: '📖', available: true },
     { id: 'music', name: '音乐库', icon: '🎵', available: false },
-    { id: 'ebook', name: '电子书', icon: '📖', available: false },
     { id: 'note', name: '笔记', icon: '📝', available: false },
   ];
 
