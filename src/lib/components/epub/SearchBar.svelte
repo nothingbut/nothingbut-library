@@ -10,8 +10,7 @@
 	let keyword = $state('');
 	let showAdvanced = $state(false);
 
-	// 高级搜索字段
-	// Note: rating fields use empty string for "不限" (unlimited) in selects
+	// Advanced search fields
 	let advancedQuery = $state({
 		title: '',
 		author: '',
@@ -48,7 +47,7 @@
 		if (publisher) query.publisher = publisher;
 		if (series) query.series = series;
 
-		// Handle rating fields (empty string means "不限" / unlimited)
+		// Handle rating fields (empty string means unlimited)
 		const ratingMin = advancedQuery.rating_min !== '' ? Number(advancedQuery.rating_min) : undefined;
 		const ratingMax = advancedQuery.rating_max !== '' ? Number(advancedQuery.rating_max) : undefined;
 
@@ -79,101 +78,91 @@
 	}
 </script>
 
-<div class="relative">
-	<!-- 基础搜索栏 -->
-	<div class="flex gap-2">
-		<div class="relative flex-1">
+<div class="search-container">
+	<!-- Basic search bar -->
+	<div class="search-bar">
+		<div class="search-input-wrapper">
 			<input
 				type="text"
 				bind:value={keyword}
 				placeholder="搜索书名、作者、出版社..."
-				class="w-full rounded-lg border border-gray-300 px-4 py-2 pr-10 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+				class="search-input"
 				onkeydown={(e) => e.key === 'Enter' && handleBasicSearch()}
 			/>
-			<button
-				class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-				onclick={handleBasicSearch}
-			>
+			<button class="search-icon-btn" onclick={handleBasicSearch} title="搜索">
 				🔍
 			</button>
 		</div>
 
-		<button
-			class="rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50"
-			onclick={() => (showAdvanced = !showAdvanced)}
-		>
+		<button class="advanced-toggle" onclick={() => (showAdvanced = !showAdvanced)}>
 			高级搜索
 		</button>
 	</div>
 
-	<!-- 高级搜索面板 -->
+	<!-- Advanced search panel -->
 	{#if showAdvanced}
-		<div class="absolute left-0 right-0 top-full z-10 mt-2 rounded-lg border bg-white p-6 shadow-lg">
-			<h3 class="mb-4 text-lg font-semibold">高级搜索</h3>
+		<div class="advanced-panel">
+			<h3 class="advanced-title">高级搜索</h3>
 
 			{#if searchError}
-				<div class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 border border-red-200">
+				<div class="error-message">
 					{searchError}
 				</div>
 			{/if}
 
-			<div class="grid grid-cols-2 gap-4">
-				<!-- 标题 -->
-				<div>
-					<label for="title" class="mb-1 block text-sm font-medium text-gray-700">标题</label>
+			<div class="advanced-grid">
+				<!-- Title -->
+				<div class="form-field">
+					<label for="title" class="field-label">标题</label>
 					<input
 						id="title"
 						type="text"
 						bind:value={advancedQuery.title}
 						placeholder="输入标题关键词"
-						class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						class="field-input"
 					/>
 				</div>
 
-				<!-- 作者 -->
-				<div>
-					<label for="author" class="mb-1 block text-sm font-medium text-gray-700">作者</label>
+				<!-- Author -->
+				<div class="form-field">
+					<label for="author" class="field-label">作者</label>
 					<input
 						id="author"
 						type="text"
 						bind:value={advancedQuery.author}
 						placeholder="输入作者名称"
-						class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						class="field-input"
 					/>
 				</div>
 
-				<!-- 出版社 -->
-				<div>
-					<label for="publisher" class="mb-1 block text-sm font-medium text-gray-700">出版社</label>
+				<!-- Publisher -->
+				<div class="form-field">
+					<label for="publisher" class="field-label">出版社</label>
 					<input
 						id="publisher"
 						type="text"
 						bind:value={advancedQuery.publisher}
 						placeholder="输入出版社名称"
-						class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						class="field-input"
 					/>
 				</div>
 
-				<!-- 系列 -->
-				<div>
-					<label for="series" class="mb-1 block text-sm font-medium text-gray-700">系列</label>
+				<!-- Series -->
+				<div class="form-field">
+					<label for="series" class="field-label">系列</label>
 					<input
 						id="series"
 						type="text"
 						bind:value={advancedQuery.series}
 						placeholder="输入系列名称"
-						class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						class="field-input"
 					/>
 				</div>
 
-				<!-- 最低评分 -->
-				<div>
-					<label for="rating_min" class="mb-1 block text-sm font-medium text-gray-700">最低评分</label>
-					<select
-						id="rating_min"
-						bind:value={advancedQuery.rating_min}
-						class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-					>
+				<!-- Min rating -->
+				<div class="form-field">
+					<label for="rating_min" class="field-label">最低评分</label>
+					<select id="rating_min" bind:value={advancedQuery.rating_min} class="field-select">
 						<option value="">不限</option>
 						<option value={1}>1 星</option>
 						<option value={2}>2 星</option>
@@ -183,14 +172,10 @@
 					</select>
 				</div>
 
-				<!-- 最高评分 -->
-				<div>
-					<label for="rating_max" class="mb-1 block text-sm font-medium text-gray-700">最高评分</label>
-					<select
-						id="rating_max"
-						bind:value={advancedQuery.rating_max}
-						class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-					>
+				<!-- Max rating -->
+				<div class="form-field">
+					<label for="rating_max" class="field-label">最高评分</label>
+					<select id="rating_max" bind:value={advancedQuery.rating_max} class="field-select">
 						<option value="">不限</option>
 						<option value={1}>1 星</option>
 						<option value={2}>2 星</option>
@@ -201,21 +186,197 @@
 				</div>
 			</div>
 
-			<!-- 按钮 -->
-			<div class="mt-6 flex justify-end gap-2">
-				<button
-					class="rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50"
-					onclick={handleClearAdvanced}
-				>
+			<!-- Action buttons -->
+			<div class="advanced-actions">
+				<button class="action-btn secondary" onclick={handleClearAdvanced}>
 					清除
 				</button>
-				<button
-					class="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-					onclick={handleAdvancedSearch}
-				>
+				<button class="action-btn primary" onclick={handleAdvancedSearch}>
 					搜索
 				</button>
 			</div>
 		</div>
 	{/if}
 </div>
+
+<style>
+	.search-container {
+		position: relative;
+	}
+
+	/* Basic search bar */
+	.search-bar {
+		display: flex;
+		gap: 12px;
+	}
+
+	.search-input-wrapper {
+		position: relative;
+		flex: 1;
+	}
+
+	.search-input {
+		width: 100%;
+		padding: 8px 40px 8px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		font-size: 14px;
+		color: var(--color-text-primary);
+		background-color: var(--color-bg-primary);
+		transition: all 0.2s ease;
+	}
+
+	.search-input:focus {
+		outline: none;
+		border-color: var(--color-primary);
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+	}
+
+	.search-input::placeholder {
+		color: var(--color-text-tertiary);
+	}
+
+	.search-icon-btn {
+		position: absolute;
+		right: 8px;
+		top: 50%;
+		transform: translateY(-50%);
+		font-size: 16px;
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 4px;
+		color: var(--color-text-tertiary);
+		transition: color 0.2s ease;
+	}
+
+	.search-icon-btn:hover {
+		color: var(--color-text-primary);
+	}
+
+	.advanced-toggle {
+		padding: 8px 16px;
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--color-text-primary);
+		background-color: var(--color-bg-primary);
+		cursor: pointer;
+		transition: all 0.2s ease;
+		white-space: nowrap;
+	}
+
+	.advanced-toggle:hover {
+		background-color: var(--color-bg-hover);
+		border-color: var(--color-primary);
+	}
+
+	/* Advanced panel */
+	.advanced-panel {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: calc(100% + 8px);
+		z-index: 10;
+		background-color: var(--color-bg-primary);
+		border: 1px solid var(--color-border);
+		border-radius: 8px;
+		padding: 20px;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+	}
+
+	.advanced-title {
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--color-text-primary);
+		margin: 0 0 16px 0;
+	}
+
+	.error-message {
+		background-color: #fef2f2;
+		border: 1px solid #fecaca;
+		border-radius: 6px;
+		padding: 12px;
+		margin-bottom: 16px;
+		color: #dc2626;
+		font-size: 13px;
+	}
+
+	.advanced-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 16px;
+		margin-bottom: 20px;
+	}
+
+	.form-field {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.field-label {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+	}
+
+	.field-input,
+	.field-select {
+		padding: 8px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		font-size: 14px;
+		color: var(--color-text-primary);
+		background-color: var(--color-bg-primary);
+		transition: all 0.2s ease;
+	}
+
+	.field-input:focus,
+	.field-select:focus {
+		outline: none;
+		border-color: var(--color-primary);
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+	}
+
+	.field-input::placeholder {
+		color: var(--color-text-tertiary);
+	}
+
+	/* Action buttons */
+	.advanced-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 12px;
+	}
+
+	.action-btn {
+		padding: 8px 16px;
+		border-radius: 6px;
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.action-btn.secondary {
+		color: var(--color-text-primary);
+		background-color: var(--color-bg-secondary);
+		border: 1px solid var(--color-border);
+	}
+
+	.action-btn.secondary:hover {
+		background-color: var(--color-bg-hover);
+	}
+
+	.action-btn.primary {
+		color: white;
+		background-color: var(--color-primary);
+		border: 1px solid var(--color-primary);
+	}
+
+	.action-btn.primary:hover {
+		opacity: 0.9;
+	}
+</style>
