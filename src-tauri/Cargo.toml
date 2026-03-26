@@ -34,9 +34,10 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "migrate
 reqwest = { version = "0.11", features = ["json", "cookies", "stream"] }
 futures = "0.3"
 scraper = "0.20"
-image = "0.25"
+image = "0.24"
 urlencoding = "2.1"
 headless_chrome = "1.0"
+epub = "2.0"
 
 [dev-dependencies]
 tempfile = "3.8"

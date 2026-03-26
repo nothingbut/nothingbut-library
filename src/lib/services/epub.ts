@@ -258,4 +258,32 @@ export class EpubService {
 			throw new Error(`Failed to set tags: ${message}`);
 		}
 	}
+
+	/**
+	 * 更新书籍封面
+	 * @param workspacePath - 工作空间路径
+	 * @param bookId - 书籍 ID
+	 * @param coverFilePath - 新封面文件路径
+	 * @throws Error if validation fails or update operation fails
+	 */
+	static async updateCover(
+		workspacePath: string,
+		bookId: number,
+		coverFilePath: string
+	): Promise<void> {
+		try {
+			this.validateNonEmptyString(workspacePath, 'workspacePath');
+			this.validatePositiveNumber(bookId, 'bookId');
+			this.validateNonEmptyString(coverFilePath, 'coverFilePath');
+
+			await invoke('update_epub_cover', {
+				workspacePath,
+				bookId,
+				coverFilePath,
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Failed to update cover';
+			throw new Error(`Failed to update cover: ${message}`);
+		}
+	}
 }

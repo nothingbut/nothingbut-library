@@ -31,5 +31,9 @@ src-tauri/target/
 # Tauri
 src-tauri/gen/
 
+# Claude Code and OMC
+.claude/
+.omc/
+
 # Git worktrees
 .worktrees/
