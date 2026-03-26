@@ -7,6 +7,7 @@
 	import BookDetailList from './BookDetailList.svelte';
 	import SearchBar from './SearchBar.svelte';
 	import BookSidebar from './BookSidebar.svelte';
+	import EpubImportDialog from './EpubImportDialog.svelte';
 
 	// State
 	let books: EpubBook[] = $state([]);
@@ -14,6 +15,7 @@
 	let viewMode: ViewMode = $state('grid');
 	let loading: boolean = $state(false);
 	let error: string | null = $state(null);
+	let showImportDialog: boolean = $state(false);
 
 	/**
 	 * Load all books from the EPUB library
@@ -72,10 +74,17 @@
 	}
 
 	/**
-	 * Handle import button click (placeholder)
+	 * Handle import button click
 	 */
 	function handleImport(): void {
-		// TODO: Open import dialog (implement in next phase)
+		showImportDialog = true;
+	}
+
+	/**
+	 * Handle import success
+	 */
+	async function handleImportSuccess(): Promise<void> {
+		await loadBooks();
 	}
 
 	onMount(() => {
@@ -182,4 +191,11 @@
 			<BookSidebar book={selectedBook} onClose={handleBookDeselect} onDeleted={handleBookDeleted} />
 		{/if}
 	</div>
+
+	<!-- Import Dialog -->
+	<EpubImportDialog
+		bind:isOpen={showImportDialog}
+		onClose={() => (showImportDialog = false)}
+		onSuccess={handleImportSuccess}
+	/>
 </div>
