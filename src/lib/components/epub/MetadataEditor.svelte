@@ -428,10 +428,12 @@
 	.editor-container {
 		display: flex;
 		flex-direction: column;
-		gap: 20px;
+		gap: 16px;
 		background-color: var(--color-bg-secondary);
 		border-radius: 8px;
-		padding: 20px;
+		padding: 16px;
+		max-height: 600px;
+		overflow-y: auto;
 	}
 
 	.editor-title {

@@ -45,12 +45,16 @@
 	function getCoverUrl(coverPath: string | null): string {
 		if (coverPath) {
 			try {
-				return convertFileSrc(coverPath);
+				const url = convertFileSrc(coverPath);
+				console.log('Cover path:', coverPath);
+				console.log('Converted URL:', url);
+				return url;
 			} catch (e) {
 				console.warn(`Failed to convert cover path for book ${book.id}:`, e);
 				return '';
 			}
 		}
+		console.log('No cover path for book:', book.id);
 		return '';
 	}
 
@@ -172,16 +176,7 @@
 				<p class="error-text">{error}</p>
 			</div>
 		{:else if bookDetails}
-			{#if editMode}
-				<MetadataEditor
-					book={bookDetails.book}
-					authors={bookDetails.authors}
-					tags={bookDetails.tags}
-					onSave={handleSaveMetadata}
-					onCancel={() => (editMode = false)}
-				/>
-			{:else}
-				<div class="details-container">
+			<div class="details-container">
 					<!-- Cover -->
 					<div class="cover-section">
 						{#if getCoverUrl(bookDetails.book.cover_path)}
@@ -302,7 +297,6 @@
 						</div>
 					{/if}
 				</div>
-			{/if}
 		{:else}
 			<div class="warning-state">
 				<p class="warning-text">无法加载书籍详情</p>
@@ -310,34 +304,44 @@
 		{/if}
 	</div>
 
-	<!-- Footer buttons -->
-	{#if !editMode}
-		<div class="sidebar-footer">
-			<button
-				onclick={handleStartReading}
-				class="action-btn primary"
-				disabled={loading || !bookDetails}
-			>
-				开始阅读
-			</button>
+	<!-- Footer buttons / Editor -->
+	<div class="sidebar-footer">
+		{#if editMode && bookDetails}
+			<MetadataEditor
+				book={bookDetails.book}
+				authors={bookDetails.authors}
+				tags={bookDetails.tags}
+				onSave={handleSaveMetadata}
+				onCancel={() => (editMode = false)}
+			/>
+		{:else}
+			<div class="action-buttons">
+				<button
+					onclick={handleStartReading}
+					class="action-btn primary"
+					disabled={loading || !bookDetails}
+				>
+					开始阅读
+				</button>
 
-			<button
-				onclick={() => (editMode = true)}
-				class="action-btn secondary"
-				disabled={loading || !bookDetails}
-			>
-				编辑
-			</button>
+				<button
+					onclick={() => (editMode = true)}
+					class="action-btn secondary"
+					disabled={loading || !bookDetails}
+				>
+					编辑
+				</button>
 
-			<button
-				onclick={handleDelete}
-				class="action-btn danger"
-				disabled={loading}
-			>
-				删除书籍
-			</button>
-		</div>
-	{/if}
+				<button
+					onclick={handleDelete}
+					class="action-btn danger"
+					disabled={loading}
+				>
+					删除书籍
+				</button>
+			</div>
+		{/if}
+	</div>
 </div>
 
 <style>
@@ -540,12 +544,15 @@
 
 	/* Footer */
 	.sidebar-footer {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
 		padding: 20px;
 		border-top: 1px solid var(--color-border);
 		flex-shrink: 0;
+	}
+
+	.action-buttons {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
 
 	.action-btn {
