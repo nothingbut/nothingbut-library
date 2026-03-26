@@ -18,6 +18,8 @@
     const path = $page.url.pathname;
     if (path === '/novel') return '网络小说';
     if (path.startsWith('/novel')) return '网络小说';
+    if (path === '/epub') return 'EPUB 书库';
+    if (path.startsWith('/epub')) return 'EPUB 书库';
     return '';
   });
 

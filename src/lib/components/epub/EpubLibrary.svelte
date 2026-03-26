@@ -92,55 +92,48 @@
 	});
 </script>
 
-<div class="flex h-screen flex-col bg-gray-50">
+<div class="epub-library">
 	<!-- Header -->
-	<div class="border-b border-gray-200 bg-white px-6 py-4 shadow-sm">
-		<div class="mb-4 flex items-center justify-between">
-			<!-- Title -->
-			<h1 class="text-2xl font-bold text-gray-900">EPUB 书库</h1>
+	<div class="library-header">
+		<div class="header-controls">
+			<!-- Search bar -->
+			<div class="search-wrapper">
+				<SearchBar onSearch={handleSearch} />
+			</div>
 
 			<!-- Right side controls -->
-			<div class="flex items-center gap-3">
+			<div class="header-actions">
 				<!-- Import button -->
 				<button
 					onclick={handleImport}
-					class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition-colors"
+					class="action-btn primary"
 					title="导入书籍"
 				>
 					📥 导入书籍
 				</button>
 
 				<!-- View mode buttons -->
-				<div class="flex gap-1 rounded-lg border border-gray-300 bg-gray-50 p-1">
+				<div class="view-mode-selector">
 					<button
 						onclick={() => (viewMode = 'grid')}
-						class={`rounded px-3 py-1 transition-colors ${
-							viewMode === 'grid'
-								? 'bg-white shadow-sm text-gray-900'
-								: 'text-gray-600 hover:text-gray-900'
-						}`}
+						class="view-btn"
+						class:active={viewMode === 'grid'}
 						title="网格视图"
 					>
 						⊞
 					</button>
 					<button
 						onclick={() => (viewMode = 'list')}
-						class={`rounded px-3 py-1 transition-colors ${
-							viewMode === 'list'
-								? 'bg-white shadow-sm text-gray-900'
-								: 'text-gray-600 hover:text-gray-900'
-						}`}
+						class="view-btn"
+						class:active={viewMode === 'list'}
 						title="列表视图"
 					>
 						☰
 					</button>
 					<button
 						onclick={() => (viewMode = 'detail')}
-						class={`rounded px-3 py-1 transition-colors ${
-							viewMode === 'detail'
-								? 'bg-white shadow-sm text-gray-900'
-								: 'text-gray-600 hover:text-gray-900'
-						}`}
+						class="view-btn"
+						class:active={viewMode === 'detail'}
 						title="详细视图"
 					>
 						≡
@@ -148,30 +141,28 @@
 				</div>
 			</div>
 		</div>
-
-		<!-- Search bar -->
-		<SearchBar onSearch={handleSearch} />
 	</div>
 
 	<!-- Main content area -->
-	<div class="flex flex-1 overflow-hidden">
+	<div class="library-content">
 		<!-- Books display area -->
-		<div class="flex-1 overflow-auto bg-gray-50 p-6">
+		<div class="books-area">
 			{#if loading}
-				<div class="flex h-full items-center justify-center">
-					<span class="text-lg text-gray-500">加载中...</span>
+				<div class="empty-state">
+					<span class="loading-text">加载中...</span>
 				</div>
 			{:else if error}
-				<div class="flex h-full items-center justify-center">
-					<div class="rounded-lg bg-red-50 p-6 text-center">
-						<p class="text-red-700">{error}</p>
+				<div class="empty-state">
+					<div class="error-box">
+						<p class="error-text">{error}</p>
 					</div>
 				</div>
 			{:else if books.length === 0}
-				<div class="flex h-full items-center justify-center">
-					<div class="text-center">
-						<p class="mb-2 text-lg font-semibold text-gray-600">暂无书籍</p>
-						<p class="text-gray-500">点击"导入书籍"开始添加</p>
+				<div class="empty-state">
+					<div class="empty-message">
+						<div class="empty-icon">📚</div>
+						<p class="empty-title">暂无书籍</p>
+						<p class="empty-hint">点击"导入书籍"开始添加</p>
 					</div>
 				</div>
 			{:else}
@@ -199,3 +190,160 @@
 		onSuccess={handleImportSuccess}
 	/>
 </div>
+
+<style>
+	.epub-library {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		overflow: hidden;
+		background-color: var(--color-bg-secondary);
+	}
+
+	/* Header */
+	.library-header {
+		background-color: var(--color-bg-primary);
+		border-bottom: 1px solid var(--color-border);
+		padding: 16px 24px;
+		flex-shrink: 0;
+	}
+
+	.header-controls {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+	}
+
+	.search-wrapper {
+		flex: 1;
+		max-width: 500px;
+	}
+
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	/* Action button */
+	.action-btn {
+		padding: 8px 16px;
+		border-radius: 6px;
+		font-size: 14px;
+		font-weight: 500;
+		color: var(--color-text-primary);
+		background-color: var(--color-bg-secondary);
+		border: 1px solid var(--color-border);
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.action-btn:hover {
+		background-color: var(--color-bg-hover);
+	}
+
+	.action-btn.primary {
+		background-color: var(--color-primary);
+		color: white;
+		border-color: var(--color-primary);
+	}
+
+	.action-btn.primary:hover {
+		opacity: 0.9;
+	}
+
+	/* View mode selector */
+	.view-mode-selector {
+		display: flex;
+		gap: 4px;
+		background-color: var(--color-bg-secondary);
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		padding: 4px;
+	}
+
+	.view-btn {
+		padding: 6px 12px;
+		border-radius: 4px;
+		font-size: 16px;
+		color: var(--color-text-secondary);
+		background-color: transparent;
+		border: none;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.view-btn:hover {
+		color: var(--color-text-primary);
+		background-color: var(--color-bg-hover);
+	}
+
+	.view-btn.active {
+		color: var(--color-text-primary);
+		background-color: var(--color-bg-primary);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	}
+
+	/* Main content */
+	.library-content {
+		display: flex;
+		flex: 1;
+		overflow: hidden;
+	}
+
+	.books-area {
+		flex: 1;
+		overflow-y: auto;
+		padding: 24px;
+	}
+
+	/* Empty states */
+	.empty-state {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
+		padding: 48px;
+	}
+
+	.loading-text {
+		font-size: 16px;
+		color: var(--color-text-secondary);
+	}
+
+	.error-box {
+		background-color: var(--color-bg-primary);
+		border: 1px solid #ef4444;
+		border-radius: 8px;
+		padding: 24px;
+		text-align: center;
+	}
+
+	.error-text {
+		color: #dc2626;
+		font-size: 14px;
+		margin: 0;
+	}
+
+	.empty-message {
+		text-align: center;
+	}
+
+	.empty-icon {
+		font-size: 64px;
+		margin-bottom: 16px;
+	}
+
+	.empty-title {
+		font-size: 18px;
+		font-weight: 600;
+		color: var(--color-text-primary);
+		margin: 0 0 8px 0;
+	}
+
+	.empty-hint {
+		font-size: 14px;
+		color: var(--color-text-secondary);
+		margin: 0;
+	}
+</style>
