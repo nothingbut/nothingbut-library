@@ -15,7 +15,7 @@
 
 	let { book, authors, tags, onSave, onCancel }: Props = $props();
 
-	// Edited state - initialized from props
+	// Edited state
 	let editedBook: EpubBook = $state(structuredClone(book));
 	let editedAuthors: string[] = $state(authors.map((a) => a.name));
 	let editedTags: string[] = $state(tags.map((t) => t.name));
@@ -27,18 +27,24 @@
 	let coverFile: string | null = $state(null);
 
 	/**
-	 * Get the cover image URL with error handling
+	 * Get cover URL
 	 */
 	function getCoverUrl(): string {
 		if (book.cover_path) {
 			try {
 				return convertFileSrc(book.cover_path);
 			} catch (e) {
-				console.warn('Failed to convert cover path:', e);
-				return '/placeholder-cover.svg';
+				return '';
 			}
 		}
-		return '/placeholder-cover.svg';
+		return '';
+	}
+
+	/**
+	 * Get initial for placeholder
+	 */
+	function getInitial(): string {
+		return book.title.charAt(0).toUpperCase();
 	}
 
 	/**
@@ -56,12 +62,12 @@
 		});
 
 		if (selected) {
-			coverFile = selected;
+			coverFile = selected as string;
 		}
 	}
 
 	/**
-	 * Add an author if it's not a duplicate
+	 * Add author
 	 */
 	function addAuthor(): void {
 		const trimmed = newAuthor.trim();
@@ -72,14 +78,14 @@
 	}
 
 	/**
-	 * Remove author by index
+	 * Remove author
 	 */
 	function removeAuthor(index: number): void {
 		editedAuthors = editedAuthors.filter((_, i) => i !== index);
 	}
 
 	/**
-	 * Add a tag if it's not a duplicate
+	 * Add tag
 	 */
 	function addTag(): void {
 		const trimmed = newTag.trim();
@@ -90,14 +96,14 @@
 	}
 
 	/**
-	 * Remove tag by index
+	 * Remove tag
 	 */
 	function removeTag(index: number): void {
 		editedTags = editedTags.filter((_, i) => i !== index);
 	}
 
 	/**
-	 * Set rating (1-5 stars)
+	 * Set rating
 	 */
 	function setRating(rating: number): void {
 		editedBook.rating = rating;
@@ -111,10 +117,9 @@
 	}
 
 	/**
-	 * Handle save action
+	 * Handle save
 	 */
 	async function handleSave(): Promise<void> {
-		// Validate title is not empty
 		if (!editedBook.title.trim()) {
 			alert('标题不能为空');
 			return;
@@ -145,93 +150,76 @@
 			saving = false;
 		}
 	}
-
-	/**
-	 * Handle Enter key in author/tag inputs
-	 */
-	function handleAuthorKeydown(e: KeyboardEvent): void {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			addAuthor();
-		}
-	}
-
-	function handleTagKeydown(e: KeyboardEvent): void {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			addTag();
-		}
-	}
 </script>
 
-<div class="space-y-4 rounded-lg bg-gray-50 p-4">
-	<h3 class="font-semibold text-gray-900">编辑书籍信息</h3>
+<div class="editor-container">
+	<h3 class="editor-title">编辑书籍信息</h3>
 
 	<!-- Cover upload -->
-	<div>
-		<label class="mb-1 block text-sm font-medium text-gray-700">封面</label>
-		<div class="flex items-center gap-4">
-			<img
-				src={getCoverUrl()}
-				alt="Current cover"
-				class="h-32 w-24 rounded object-cover"
-			/>
-			<div class="flex-1">
+	<div class="form-group">
+		<label class="form-label">封面</label>
+		<div class="cover-upload">
+			{#if getCoverUrl()}
+				<img src={getCoverUrl()} alt="Current cover" class="cover-preview" />
+			{:else}
+				<div class="cover-placeholder">
+					{getInitial()}
+				</div>
+			{/if}
+			<div class="upload-actions">
 				<button
 					type="button"
-					class="rounded bg-gray-600 px-4 py-2 text-white hover:bg-gray-700 disabled:bg-gray-400"
+					class="upload-btn"
 					onclick={handleCoverUpload}
 					disabled={saving}
 				>
 					选择新封面
 				</button>
 				{#if coverFile}
-					<p class="mt-2 text-sm text-green-600">
-						已选择新封面
-					</p>
+					<p class="upload-success">已选择新封面</p>
 				{/if}
 			</div>
 		</div>
 	</div>
 
-	<!-- Title (required) -->
-	<div>
-		<label for="title" class="mb-1 block text-sm font-medium text-gray-700">
-			标题 <span class="text-red-600">*</span>
+	<!-- Title -->
+	<div class="form-group">
+		<label for="title" class="form-label">
+			标题 <span class="required">*</span>
 		</label>
 		<input
 			id="title"
 			type="text"
 			bind:value={editedBook.title}
 			placeholder="输入书籍标题"
-			class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+			class="form-input"
 			disabled={saving}
 		/>
 	</div>
 
 	<!-- Sort title -->
-	<div>
-		<label for="sort_title" class="mb-1 block text-sm font-medium text-gray-700">排序标题</label>
+	<div class="form-group">
+		<label for="sort_title" class="form-label">排序标题</label>
 		<input
 			id="sort_title"
 			type="text"
 			bind:value={editedBook.sort_title}
 			placeholder="用于排序的标题"
-			class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+			class="form-input"
 			disabled={saving}
 		/>
 	</div>
 
 	<!-- Authors -->
-	<div>
-		<label for="authors-input" class="mb-2 block text-sm font-medium text-gray-700">作者</label>
-		<div class="mb-2 flex flex-wrap gap-2">
+	<div class="form-group">
+		<label class="form-label">作者</label>
+		<div class="chips-list">
 			{#each editedAuthors as author, index (index)}
-				<div class="flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1">
-					<span class="text-sm font-medium text-blue-800">{author}</span>
+				<div class="chip author-chip">
+					<span class="chip-text">{author}</span>
 					<button
 						onclick={() => removeAuthor(index)}
-						class="ml-1 text-blue-600 hover:text-blue-800"
+						class="chip-remove"
 						disabled={saving}
 						title="删除"
 					>
@@ -240,98 +228,93 @@
 				</div>
 			{/each}
 		</div>
-		<div class="flex gap-2">
+		<div class="input-with-button">
 			<input
-				id="authors-input"
 				type="text"
 				bind:value={newAuthor}
 				placeholder="输入作者名称"
-				class="flex-1 rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+				class="form-input"
 				disabled={saving}
-				onkeydown={handleAuthorKeydown}
+				onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), addAuthor())}
 			/>
-			<button
-				onclick={addAuthor}
-				class="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-400"
-				disabled={saving}
-			>
+			<button onclick={addAuthor} class="add-btn" disabled={saving}>
 				添加
 			</button>
 		</div>
 	</div>
 
-	<!-- Series and series index (2-column grid) -->
-	<div class="grid grid-cols-2 gap-4">
-		<div>
-			<label for="series" class="mb-1 block text-sm font-medium text-gray-700">系列</label>
+	<!-- Series -->
+	<div class="form-row">
+		<div class="form-group">
+			<label for="series" class="form-label">系列</label>
 			<input
 				id="series"
 				type="text"
 				bind:value={editedBook.series}
 				placeholder="系列名称"
-				class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+				class="form-input"
 				disabled={saving}
 			/>
 		</div>
 
-		<div>
-			<label for="series_index" class="mb-1 block text-sm font-medium text-gray-700">系列序号</label>
+		<div class="form-group">
+			<label for="series_index" class="form-label">系列序号</label>
 			<input
 				id="series_index"
 				type="number"
 				bind:value={editedBook.series_index}
 				placeholder="序号"
-				class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+				class="form-input"
 				disabled={saving}
 			/>
 		</div>
 	</div>
 
 	<!-- Publisher -->
-	<div>
-		<label for="publisher" class="mb-1 block text-sm font-medium text-gray-700">出版社</label>
+	<div class="form-group">
+		<label for="publisher" class="form-label">出版社</label>
 		<input
 			id="publisher"
 			type="text"
 			bind:value={editedBook.publisher}
 			placeholder="出版社名称"
-			class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+			class="form-input"
 			disabled={saving}
 		/>
 	</div>
 
 	<!-- Publication date -->
-	<div>
-		<label for="pubdate" class="mb-1 block text-sm font-medium text-gray-700">出版日期</label>
+	<div class="form-group">
+		<label for="pubdate" class="form-label">出版日期</label>
 		<input
 			id="pubdate"
 			type="date"
 			bind:value={editedBook.pubdate}
-			class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+			class="form-input"
 			disabled={saving}
 		/>
 	</div>
 
 	<!-- ISBN -->
-	<div>
-		<label for="isbn" class="mb-1 block text-sm font-medium text-gray-700">ISBN</label>
+	<div class="form-group">
+		<label for="isbn" class="form-label">ISBN</label>
 		<input
 			id="isbn"
 			type="text"
 			bind:value={editedBook.isbn}
 			placeholder="ISBN 号"
-			class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+			class="form-input"
 			disabled={saving}
 		/>
 	</div>
 
 	<!-- Language -->
-	<div>
-		<label for="language" class="mb-1 block text-sm font-medium text-gray-700">语言</label>
+	<div class="form-group">
+		<label for="language" class="form-label">语言</label>
 		<select
 			id="language"
 			bind:value={editedBook.language}
-			class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+			class="form-select"
 			disabled={saving}
 		>
 			<option value={null}>未设置</option>
@@ -344,18 +327,17 @@
 		</select>
 	</div>
 
-	<!-- Rating (star buttons) -->
-	<fieldset>
-		<legend class="mb-2 block text-sm font-medium text-gray-700">评分</legend>
-		<div class="flex items-center gap-2">
-			<div class="flex gap-1">
+	<!-- Rating -->
+	<div class="form-group">
+		<label class="form-label">评分</label>
+		<div class="rating-control">
+			<div class="rating-stars">
 				{#each [1, 2, 3, 4, 5] as star (star)}
 					<button
 						type="button"
 						onclick={() => setRating(star)}
-						class="text-2xl transition-colors {editedBook.rating !== null && editedBook.rating >= star
-							? 'text-yellow-500'
-							: 'text-gray-300 hover:text-yellow-400'}"
+						class="star-btn"
+						class:active={editedBook.rating !== null && editedBook.rating >= star}
 						disabled={saving}
 						title={`${star} 星`}
 					>
@@ -366,27 +348,27 @@
 			<button
 				type="button"
 				onclick={clearRating}
-				class="ml-2 rounded border border-gray-300 px-2 py-1 text-sm text-gray-600 hover:bg-gray-100 disabled:bg-gray-100"
+				class="clear-rating-btn"
 				disabled={saving}
 			>
 				清除
 			</button>
 			{#if editedBook.rating !== null}
-				<span class="text-sm text-gray-600">{editedBook.rating.toFixed(1)}</span>
+				<span class="rating-value">{editedBook.rating.toFixed(1)}</span>
 			{/if}
 		</div>
-	</fieldset>
+	</div>
 
 	<!-- Tags -->
-	<div>
-		<label for="tags-input" class="mb-2 block text-sm font-medium text-gray-700">标签</label>
-		<div class="mb-2 flex flex-wrap gap-2">
+	<div class="form-group">
+		<label class="form-label">标签</label>
+		<div class="chips-list">
 			{#each editedTags as tag, index (index)}
-				<div class="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1">
-					<span class="text-sm font-medium text-green-800">{tag}</span>
+				<div class="chip tag-chip">
+					<span class="chip-text">{tag}</span>
 					<button
 						onclick={() => removeTag(index)}
-						class="ml-1 text-green-600 hover:text-green-800"
+						class="chip-remove"
 						disabled={saving}
 						title="删除"
 					>
@@ -395,54 +377,394 @@
 				</div>
 			{/each}
 		</div>
-		<div class="flex gap-2">
+		<div class="input-with-button">
 			<input
-				id="tags-input"
 				type="text"
 				bind:value={newTag}
 				placeholder="输入标签名称"
-				class="flex-1 rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+				class="form-input"
 				disabled={saving}
-				onkeydown={handleTagKeydown}
+				onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
 			/>
-			<button
-				onclick={addTag}
-				class="rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:bg-gray-400"
-				disabled={saving}
-			>
+			<button onclick={addTag} class="add-btn tag" disabled={saving}>
 				添加
 			</button>
 		</div>
 	</div>
 
 	<!-- Description -->
-	<div>
-		<label for="description" class="mb-1 block text-sm font-medium text-gray-700">简介</label>
+	<div class="form-group">
+		<label for="description" class="form-label">简介</label>
 		<textarea
 			id="description"
 			bind:value={editedBook.description}
 			placeholder="书籍简介"
 			rows="6"
-			class="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+			class="form-textarea"
 			disabled={saving}
 		></textarea>
 	</div>
 
-	<!-- Save and cancel buttons -->
-	<div class="flex gap-2 border-t border-gray-200 pt-4">
+	<!-- Actions -->
+	<div class="editor-actions">
 		<button
 			onclick={handleSave}
-			class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:bg-gray-400"
+			class="action-btn primary"
 			disabled={saving}
 		>
 			{saving ? '保存中...' : '保存'}
 		</button>
 		<button
 			onclick={onCancel}
-			class="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-900 hover:bg-gray-50 disabled:bg-gray-50"
+			class="action-btn secondary"
 			disabled={saving}
 		>
 			取消
 		</button>
 	</div>
 </div>
+
+<style>
+	.editor-container {
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+		background-color: var(--color-bg-secondary);
+		border-radius: 8px;
+		padding: 20px;
+	}
+
+	.editor-title {
+		font-size: 16px;
+		font-weight: 600;
+		color: var(--color-text-primary);
+		margin: 0;
+	}
+
+	/* Form groups */
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.form-row {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 16px;
+	}
+
+	.form-label {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+	}
+
+	.required {
+		color: #dc2626;
+	}
+
+	.form-input,
+	.form-select,
+	.form-textarea {
+		padding: 8px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 6px;
+		font-size: 14px;
+		color: var(--color-text-primary);
+		background-color: var(--color-bg-primary);
+		transition: all 0.2s ease;
+	}
+
+	.form-input:focus,
+	.form-select:focus,
+	.form-textarea:focus {
+		outline: none;
+		border-color: var(--color-primary);
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+	}
+
+	.form-input::placeholder,
+	.form-textarea::placeholder {
+		color: var(--color-text-tertiary);
+	}
+
+	.form-input:disabled,
+	.form-select:disabled,
+	.form-textarea:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.form-textarea {
+		resize: vertical;
+		min-height: 100px;
+		font-family: inherit;
+		line-height: 1.5;
+	}
+
+	/* Cover upload */
+	.cover-upload {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+	}
+
+	.cover-preview {
+		width: 80px;
+		height: 120px;
+		object-fit: cover;
+		border-radius: 4px;
+	}
+
+	.cover-placeholder {
+		width: 80px;
+		height: 120px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 32px;
+		font-weight: 600;
+		color: var(--color-text-tertiary);
+		background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg-hover) 100%);
+		border-radius: 4px;
+	}
+
+	.upload-actions {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.upload-btn {
+		padding: 8px 16px;
+		border-radius: 6px;
+		font-size: 13px;
+		font-weight: 500;
+		color: white;
+		background-color: #6b7280;
+		border: none;
+		cursor: pointer;
+		transition: background-color 0.2s ease;
+	}
+
+	.upload-btn:hover:not(:disabled) {
+		background-color: #4b5563;
+	}
+
+	.upload-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.upload-success {
+		font-size: 12px;
+		color: #16a34a;
+		margin: 0;
+	}
+
+	/* Chips */
+	.chips-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		min-height: 32px;
+	}
+
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 4px 12px;
+		border-radius: 16px;
+		font-size: 12px;
+		font-weight: 500;
+	}
+
+	.author-chip {
+		background-color: #dbeafe;
+		color: #1e40af;
+	}
+
+	.tag-chip {
+		background-color: #d1fae5;
+		color: #065f46;
+	}
+
+	.chip-text {
+		line-height: 1.4;
+	}
+
+	.chip-remove {
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+		font-size: 14px;
+		line-height: 1;
+		transition: opacity 0.2s ease;
+	}
+
+	.author-chip .chip-remove {
+		color: #1e40af;
+	}
+
+	.tag-chip .chip-remove {
+		color: #065f46;
+	}
+
+	.chip-remove:hover:not(:disabled) {
+		opacity: 0.7;
+	}
+
+	.chip-remove:disabled {
+		opacity: 0.3;
+		cursor: not-allowed;
+	}
+
+	/* Input with button */
+	.input-with-button {
+		display: flex;
+		gap: 8px;
+	}
+
+	.input-with-button .form-input {
+		flex: 1;
+	}
+
+	.add-btn {
+		padding: 8px 16px;
+		border-radius: 6px;
+		font-size: 13px;
+		font-weight: 500;
+		color: white;
+		background-color: #2563eb;
+		border: none;
+		cursor: pointer;
+		transition: background-color 0.2s ease;
+		white-space: nowrap;
+	}
+
+	.add-btn:hover:not(:disabled) {
+		background-color: #1d4ed8;
+	}
+
+	.add-btn.tag {
+		background-color: #16a34a;
+	}
+
+	.add-btn.tag:hover:not(:disabled) {
+		background-color: #15803d;
+	}
+
+	.add-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	/* Rating */
+	.rating-control {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.rating-stars {
+		display: flex;
+		gap: 4px;
+	}
+
+	.star-btn {
+		font-size: 24px;
+		color: var(--color-border);
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+		transition: color 0.2s ease;
+		line-height: 1;
+	}
+
+	.star-btn:hover:not(:disabled) {
+		color: #fbbf24;
+	}
+
+	.star-btn.active {
+		color: #fbbf24;
+	}
+
+	.star-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.clear-rating-btn {
+		padding: 4px 12px;
+		border: 1px solid var(--color-border);
+		border-radius: 4px;
+		font-size: 12px;
+		color: var(--color-text-secondary);
+		background-color: var(--color-bg-primary);
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.clear-rating-btn:hover:not(:disabled) {
+		background-color: var(--color-bg-hover);
+	}
+
+	.clear-rating-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.rating-value {
+		font-size: 13px;
+		color: var(--color-text-secondary);
+	}
+
+	/* Actions */
+	.editor-actions {
+		display: flex;
+		gap: 12px;
+		padding-top: 16px;
+		border-top: 1px solid var(--color-border);
+	}
+
+	.action-btn {
+		flex: 1;
+		padding: 10px 16px;
+		border-radius: 6px;
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		border: 1px solid;
+	}
+
+	.action-btn.primary {
+		background-color: var(--color-primary);
+		color: white;
+		border-color: var(--color-primary);
+	}
+
+	.action-btn.primary:hover:not(:disabled) {
+		opacity: 0.9;
+	}
+
+	.action-btn.secondary {
+		background-color: var(--color-bg-primary);
+		color: var(--color-text-primary);
+		border-color: var(--color-border);
+	}
+
+	.action-btn.secondary:hover:not(:disabled) {
+		background-color: var(--color-bg-hover);
+	}
+
+	.action-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+</style>

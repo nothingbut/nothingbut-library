@@ -41,7 +41,6 @@
 
 	/**
 	 * Convert a file path to a usable Tauri asset URL
-	 * Falls back to placeholder if cover is not available
 	 */
 	function getCoverUrl(coverPath: string | null): string {
 		if (coverPath) {
@@ -49,25 +48,21 @@
 				return convertFileSrc(coverPath);
 			} catch (e) {
 				console.warn(`Failed to convert cover path for book ${book.id}:`, e);
-				return '/placeholder-cover.svg';
+				return '';
 			}
 		}
-		return '/placeholder-cover.svg';
+		return '';
 	}
 
 	/**
-	 * Handle image loading errors by falling back to placeholder
+	 * Get first letter for placeholder
 	 */
-	function handleImageError(event: Event): void {
-		const img = event.target as HTMLImageElement;
-		if (img.src !== '/placeholder-cover.svg') {
-			img.src = '/placeholder-cover.svg';
-		}
+	function getInitial(title: string): string {
+		return title.charAt(0).toUpperCase();
 	}
 
 	/**
 	 * Convert rating number (0-5) to star representation
-	 * Returns "未评分" if no rating
 	 */
 	function getRatingStars(rating: number | null): string {
 		if (rating === null || rating < 0 || rating > 5) {
@@ -79,7 +74,7 @@
 	}
 
 	/**
-	 * Format file size specifically to MB with 2 decimals
+	 * Format file size to MB
 	 */
 	function formatFileSizeMB(bytes: number): string {
 		const mb = bytes / (1024 * 1024);
@@ -87,7 +82,7 @@
 	}
 
 	/**
-	 * Format date to Chinese locale format (YYYY-MM-DD)
+	 * Format date
 	 */
 	function formatDate(dateStr: string): string {
 		try {
@@ -98,21 +93,18 @@
 				day: '2-digit'
 			});
 		} catch (e) {
-			console.warn(`Failed to format date ${dateStr}:`, e);
 			return '日期格式错误';
 		}
 	}
 
 	/**
-	 * Handle delete action with confirmation dialog
+	 * Handle delete action with confirmation
 	 */
 	async function handleDelete(): Promise<void> {
-		// Show confirmation dialog
 		if (!confirm('确定要删除这本书籍吗？此操作无法撤销。')) {
 			return;
 		}
 
-		// Validate workspace is selected
 		const workspace = $currentWorkspace;
 		if (!workspace) {
 			error = '未选择工作空间';
@@ -130,31 +122,22 @@
 	}
 
 	/**
-	 * Handle start reading action (placeholder)
+	 * Handle start reading
 	 */
 	function handleStartReading(): void {
-		// TODO: Implement reading functionality (Week 4)
+		// TODO: Implement reading functionality
 		console.log('Start reading:', book.id);
 	}
 
 	/**
-	 * Handle save metadata action
+	 * Handle save metadata
 	 */
 	async function handleSaveMetadata(updatedData: any): Promise<void> {
 		try {
-			// Update book metadata
 			await EpubService.updateMetadata(book.id, updatedData.book);
-
-			// Update authors
 			await EpubService.setAuthors(book.id, updatedData.authors);
-
-			// Update tags
 			await EpubService.setTags(book.id, updatedData.tags);
-
-			// Refresh data
 			await loadBookDetails();
-
-			// Exit edit mode
 			editMode = false;
 		} catch (err) {
 			const message = err instanceof Error ? err.message : '保存失败';
@@ -169,202 +152,445 @@
 	});
 </script>
 
-<!-- Sidebar container -->
-<div class="flex h-full w-96 flex-col border-l border-gray-200 bg-white shadow-lg">
+<div class="sidebar">
 	<!-- Header -->
-	<div class="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-		<h2 class="text-lg font-bold text-gray-900">书籍详情</h2>
-		<button
-			onclick={onClose}
-			class="text-gray-400 hover:text-gray-600"
-			aria-label="Close sidebar"
-			title="关闭"
-		>
+	<div class="sidebar-header">
+		<h2 class="sidebar-title">书籍详情</h2>
+		<button onclick={onClose} class="close-btn" title="关闭">
 			✕
 		</button>
 	</div>
 
-	<!-- Content area (scrollable) -->
-	<div class="flex-1 overflow-y-auto px-6 py-4">
+	<!-- Content -->
+	<div class="sidebar-content">
 		{#if loading}
-			<div class="flex items-center justify-center py-8">
-				<span class="text-gray-500">加载中...</span>
+			<div class="loading-state">
+				<span class="loading-text">加载中...</span>
 			</div>
 		{:else if error}
-			<div class="rounded-md bg-red-50 p-3">
-				<p class="text-sm text-red-800">{error}</p>
+			<div class="error-state">
+				<p class="error-text">{error}</p>
 			</div>
 		{:else if bookDetails}
-			<div class="space-y-4">
-				<!-- Cover image -->
-				<div class="flex justify-center">
-					<div class="h-80 w-56 overflow-hidden rounded-lg shadow-md">
-						<img
-							src={getCoverUrl(bookDetails.book.cover_path)}
-							alt={bookDetails.book.title}
-							class="h-full w-full object-cover"
-							onerror={handleImageError}
-						/>
+			{#if editMode}
+				<MetadataEditor
+					book={bookDetails.book}
+					authors={bookDetails.authors}
+					tags={bookDetails.tags}
+					onSave={handleSaveMetadata}
+					onCancel={() => (editMode = false)}
+				/>
+			{:else}
+				<div class="details-container">
+					<!-- Cover -->
+					<div class="cover-section">
+						{#if getCoverUrl(bookDetails.book.cover_path)}
+							<img
+								src={getCoverUrl(bookDetails.book.cover_path)}
+								alt={bookDetails.book.title}
+								class="cover-image"
+							/>
+						{:else}
+							<div class="cover-placeholder">
+								{getInitial(bookDetails.book.title)}
+							</div>
+						{/if}
 					</div>
-				</div>
 
-				<!-- Title -->
-				<div>
-					<h3 class="text-xl font-bold text-gray-900">{bookDetails.book.title}</h3>
-				</div>
+					<!-- Title -->
+					<h3 class="book-title">{bookDetails.book.title}</h3>
 
-				<!-- Sort title -->
-				{#if bookDetails.book.sort_title}
-					<div>
-						<p class="text-sm text-gray-600">
-							<span class="font-semibold">排序标题:</span> {bookDetails.book.sort_title}
-						</p>
-					</div>
-				{/if}
+					<!-- Details grid -->
+					<div class="details-grid">
+						<!-- Sort title -->
+						{#if bookDetails.book.sort_title}
+							<div class="detail-item">
+								<span class="detail-label">排序标题:</span>
+								<span class="detail-value">{bookDetails.book.sort_title}</span>
+							</div>
+						{/if}
 
-				<!-- Authors -->
-				<div>
-					<p class="text-sm text-gray-600">
-						<span class="font-semibold">作者:</span>
-						{bookDetails.authors.length > 0
-							? bookDetails.authors.map((a) => a.name).join(', ')
-							: '-'}
-					</p>
-				</div>
+						<!-- Authors -->
+						<div class="detail-item">
+							<span class="detail-label">作者:</span>
+							<span class="detail-value">
+								{bookDetails.authors.length > 0
+									? bookDetails.authors.map((a) => a.name).join(', ')
+									: '-'}
+							</span>
+						</div>
 
-				<!-- Series -->
-				{#if bookDetails.book.series}
-					<div>
-						<p class="text-sm text-gray-600">
-							<span class="font-semibold">系列:</span> {bookDetails.book.series}
-							{#if bookDetails.book.series_index !== null}
-								#{bookDetails.book.series_index}
-							{/if}
-						</p>
-					</div>
-				{/if}
-
-				<!-- Publisher and publication date -->
-				<div>
-					<p class="text-sm text-gray-600">
-						<span class="font-semibold">出版社:</span>
-						{bookDetails.book.publisher || '-'}
-					</p>
-					{#if bookDetails.book.pubdate}
-						<p class="text-sm text-gray-600">
-							<span class="font-semibold">出版日期:</span> {bookDetails.book.pubdate}
-						</p>
-					{/if}
-				</div>
-
-				<!-- ISBN -->
-				{#if bookDetails.book.isbn}
-					<div>
-						<p class="text-sm text-gray-600">
-							<span class="font-semibold">ISBN:</span> {bookDetails.book.isbn}
-						</p>
-					</div>
-				{/if}
-
-				<!-- Language -->
-				{#if bookDetails.book.language}
-					<div>
-						<p class="text-sm text-gray-600">
-							<span class="font-semibold">语言:</span> {bookDetails.book.language}
-						</p>
-					</div>
-				{/if}
-
-				<!-- Rating -->
-				<div>
-					<p class="text-sm text-gray-600">
-						<span class="font-semibold">评分:</span>
-						<span class="text-yellow-500">{getRatingStars(bookDetails.book.rating)}</span>
-					</p>
-				</div>
-
-				<!-- Tags -->
-				{#if bookDetails.tags.length > 0}
-					<div>
-						<p class="mb-2 text-sm font-semibold text-gray-600">标签:</p>
-						<div class="flex flex-wrap gap-2">
-							{#each bookDetails.tags as tag (tag.id)}
-								<span
-									class="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800"
-								>
-									{tag.name}
+						<!-- Series -->
+						{#if bookDetails.book.series}
+							<div class="detail-item">
+								<span class="detail-label">系列:</span>
+								<span class="detail-value">
+									{bookDetails.book.series}
+									{#if bookDetails.book.series_index !== null}
+										#{bookDetails.book.series_index}
+									{/if}
 								</span>
-							{/each}
+							</div>
+						{/if}
+
+						<!-- Publisher -->
+						<div class="detail-item">
+							<span class="detail-label">出版社:</span>
+							<span class="detail-value">{bookDetails.book.publisher || '-'}</span>
+						</div>
+
+						<!-- Pubdate -->
+						{#if bookDetails.book.pubdate}
+							<div class="detail-item">
+								<span class="detail-label">出版日期:</span>
+								<span class="detail-value">{bookDetails.book.pubdate}</span>
+							</div>
+						{/if}
+
+						<!-- ISBN -->
+						{#if bookDetails.book.isbn}
+							<div class="detail-item">
+								<span class="detail-label">ISBN:</span>
+								<span class="detail-value">{bookDetails.book.isbn}</span>
+							</div>
+						{/if}
+
+						<!-- Language -->
+						{#if bookDetails.book.language}
+							<div class="detail-item">
+								<span class="detail-label">语言:</span>
+								<span class="detail-value">{bookDetails.book.language}</span>
+							</div>
+						{/if}
+
+						<!-- Rating -->
+						<div class="detail-item">
+							<span class="detail-label">评分:</span>
+							<span class="rating-stars">{getRatingStars(bookDetails.book.rating)}</span>
+						</div>
+
+						<!-- File size -->
+						<div class="detail-item">
+							<span class="detail-label">文件大小:</span>
+							<span class="detail-value">{formatFileSizeMB(bookDetails.book.file_size)}</span>
+						</div>
+
+						<!-- Created date -->
+						<div class="detail-item">
+							<span class="detail-label">添加日期:</span>
+							<span class="detail-value">{formatDate(bookDetails.book.created_at)}</span>
 						</div>
 					</div>
-				{/if}
 
-				<!-- Description -->
-				{#if bookDetails.book.description}
-					<div>
-						<p class="mb-2 text-sm font-semibold text-gray-600">简介:</p>
-						<p class="whitespace-pre-wrap text-sm text-gray-700">{bookDetails.book.description}</p>
-					</div>
-				{/if}
+					<!-- Tags -->
+					{#if bookDetails.tags.length > 0}
+						<div class="tags-section">
+							<div class="section-label">标签:</div>
+							<div class="tags-list">
+								{#each bookDetails.tags as tag (tag.id)}
+									<span class="tag-badge">{tag.name}</span>
+								{/each}
+							</div>
+						</div>
+					{/if}
 
-				<!-- File size -->
-				<div>
-					<p class="text-sm text-gray-600">
-						<span class="font-semibold">文件大小:</span> {formatFileSizeMB(bookDetails.book.file_size)}
-					</p>
+					<!-- Description -->
+					{#if bookDetails.book.description}
+						<div class="description-section">
+							<div class="section-label">简介:</div>
+							<p class="description-text">{bookDetails.book.description}</p>
+						</div>
+					{/if}
 				</div>
-
-				<!-- Created date -->
-				<div>
-					<p class="text-sm text-gray-600">
-						<span class="font-semibold">添加日期:</span> {formatDate(bookDetails.book.created_at)}
-					</p>
-				</div>
-			</div>
+			{/if}
 		{:else}
-			<div class="rounded-md bg-yellow-50 p-3">
-				<p class="text-sm text-yellow-800">无法加载书籍详情</p>
+			<div class="warning-state">
+				<p class="warning-text">无法加载书籍详情</p>
 			</div>
 		{/if}
 	</div>
 
 	<!-- Footer buttons -->
-	<div class="space-y-2 border-t border-gray-200 px-6 py-4">
-		{#if editMode && bookDetails}
-			<MetadataEditor
-				book={bookDetails.book}
-				authors={bookDetails.authors}
-				tags={bookDetails.tags}
-				onSave={handleSaveMetadata}
-				onCancel={() => (editMode = false)}
-			/>
-		{:else}
-			<!-- Start reading button -->
+	{#if !editMode}
+		<div class="sidebar-footer">
 			<button
 				onclick={handleStartReading}
-				class="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition-colors"
+				class="action-btn primary"
 				disabled={loading || !bookDetails}
 			>
 				开始阅读
 			</button>
 
-			<!-- Edit button -->
 			<button
-				onclick={() => (editMode = !editMode)}
-				class="w-full rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-900 hover:bg-gray-200 transition-colors"
+				onclick={() => (editMode = true)}
+				class="action-btn secondary"
 				disabled={loading || !bookDetails}
 			>
-				{editMode ? '取消编辑' : '编辑'}
+				编辑
 			</button>
 
-			<!-- Delete button -->
 			<button
 				onclick={handleDelete}
-				class="w-full rounded-lg border border-red-600 px-4 py-2 font-medium text-red-600 hover:bg-red-50 transition-colors"
+				class="action-btn danger"
 				disabled={loading}
 			>
 				删除书籍
 			</button>
-		{/if}
-	</div>
+		</div>
+	{/if}
 </div>
+
+<style>
+	.sidebar {
+		display: flex;
+		flex-direction: column;
+		width: 400px;
+		height: 100%;
+		background-color: var(--color-bg-primary);
+		border-left: 1px solid var(--color-border);
+		box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+	}
+
+	/* Header */
+	.sidebar-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 16px 20px;
+		border-bottom: 1px solid var(--color-border);
+		flex-shrink: 0;
+	}
+
+	.sidebar-title {
+		font-size: 18px;
+		font-weight: 600;
+		color: var(--color-text-primary);
+		margin: 0;
+	}
+
+	.close-btn {
+		font-size: 20px;
+		color: var(--color-text-tertiary);
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 4px;
+		transition: color 0.2s ease;
+	}
+
+	.close-btn:hover {
+		color: var(--color-text-primary);
+	}
+
+	/* Content */
+	.sidebar-content {
+		flex: 1;
+		overflow-y: auto;
+		padding: 20px;
+	}
+
+	/* States */
+	.loading-state,
+	.error-state,
+	.warning-state {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 32px 16px;
+	}
+
+	.loading-text {
+		color: var(--color-text-secondary);
+		font-size: 14px;
+	}
+
+	.error-state {
+		background-color: #fef2f2;
+		border: 1px solid #fecaca;
+		border-radius: 6px;
+		padding: 16px;
+	}
+
+	.error-text {
+		color: #dc2626;
+		font-size: 13px;
+		margin: 0;
+	}
+
+	.warning-state {
+		background-color: #fffbeb;
+		border: 1px solid #fde68a;
+		border-radius: 6px;
+		padding: 16px;
+	}
+
+	.warning-text {
+		color: #d97706;
+		font-size: 13px;
+		margin: 0;
+	}
+
+	/* Details */
+	.details-container {
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+	}
+
+	.cover-section {
+		display: flex;
+		justify-content: center;
+	}
+
+	.cover-image {
+		width: 200px;
+		height: 300px;
+		object-fit: cover;
+		border-radius: 8px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	}
+
+	.cover-placeholder {
+		width: 200px;
+		height: 300px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 80px;
+		font-weight: 600;
+		color: var(--color-text-tertiary);
+		background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg-hover) 100%);
+		border-radius: 8px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+	}
+
+	.book-title {
+		font-size: 20px;
+		font-weight: 600;
+		color: var(--color-text-primary);
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.details-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.detail-item {
+		display: flex;
+		gap: 8px;
+		font-size: 13px;
+		line-height: 1.5;
+	}
+
+	.detail-label {
+		font-weight: 500;
+		color: var(--color-text-secondary);
+		flex-shrink: 0;
+	}
+
+	.detail-value {
+		color: var(--color-text-primary);
+		flex: 1;
+	}
+
+	.rating-stars {
+		color: #fbbf24;
+		font-size: 14px;
+	}
+
+	.tags-section,
+	.description-section {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.section-label {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+	}
+
+	.tags-list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.tag-badge {
+		display: inline-block;
+		padding: 4px 12px;
+		border-radius: 16px;
+		background-color: #dbeafe;
+		color: #1e40af;
+		font-size: 12px;
+		font-weight: 500;
+	}
+
+	.description-text {
+		font-size: 13px;
+		color: var(--color-text-primary);
+		line-height: 1.6;
+		white-space: pre-wrap;
+		margin: 0;
+	}
+
+	/* Footer */
+	.sidebar-footer {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 20px;
+		border-top: 1px solid var(--color-border);
+		flex-shrink: 0;
+	}
+
+	.action-btn {
+		width: 100%;
+		padding: 10px 16px;
+		border-radius: 6px;
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		border: 1px solid;
+	}
+
+	.action-btn.primary {
+		background-color: var(--color-primary);
+		color: white;
+		border-color: var(--color-primary);
+	}
+
+	.action-btn.primary:hover:not(:disabled) {
+		opacity: 0.9;
+	}
+
+	.action-btn.secondary {
+		background-color: var(--color-bg-secondary);
+		color: var(--color-text-primary);
+		border-color: var(--color-border);
+	}
+
+	.action-btn.secondary:hover:not(:disabled) {
+		background-color: var(--color-bg-hover);
+	}
+
+	.action-btn.danger {
+		background-color: transparent;
+		color: #dc2626;
+		border-color: #dc2626;
+	}
+
+	.action-btn.danger:hover:not(:disabled) {
+		background-color: #fef2f2;
+	}
+
+	.action-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+</style>
