@@ -27,6 +27,15 @@
         "minWidth": 1024,
         "minHeight": 768
       }
-    ]
+    ],
+    "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/**",
+          "$HOME/Library/Application Support/**"
+        ]
+      }
+    }
   }
 }
