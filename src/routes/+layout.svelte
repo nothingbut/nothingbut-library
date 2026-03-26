@@ -10,7 +10,10 @@
     try {
       // Get application data directory
       const appData = await appDataDir();
-      const workspacePath = `${appData}workspace`;
+      // Ensure proper path separator
+      const workspacePath = appData.endsWith('/')
+        ? `${appData}workspace`
+        : `${appData}/workspace`;
 
       const defaultWorkspace = {
         id: 'default',
