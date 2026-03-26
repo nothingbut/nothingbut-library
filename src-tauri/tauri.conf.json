@@ -30,11 +30,12 @@
     ],
     "security": {
       "assetProtocol": {
-        "enable": true,
-        "scope": [
-          "$APPDATA/**",
-          "$HOME/Library/Application Support/**"
-        ]
+        "scope": {
+          "allow": [
+            "$APPDATA/**",
+            "$HOME/Library/Application Support/**"
+          ]
+        }
       }
     }
   }
