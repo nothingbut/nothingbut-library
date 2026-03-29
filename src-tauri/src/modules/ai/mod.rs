@@ -1,3 +1,4 @@
+pub mod assistant;
 pub mod commands;
 pub mod database;
 pub mod models;
@@ -12,7 +13,7 @@ use tokio::sync::Semaphore;
 use std::sync::LazyLock;
 
 // 默认模型配置
-pub const DEFAULT_CHAT_MODEL: &str = "qwen2.5:7b";
+pub const DEFAULT_CHAT_MODEL: &str = "qwen2.5:7b-instruct";
 pub const DEFAULT_EMBEDDING_MODEL: &str = "nomic-embed-text";
 pub const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
 

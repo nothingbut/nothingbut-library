@@ -86,11 +86,24 @@ pub fn run() {
 
                 // Store pool in app state
                 app_handle.manage(pool);
+
+                // Initialize music player
+                println!("Initializing music player...");
+                match modules::music::player::init_player() {
+                    Ok(_) => println!("Music player initialized successfully"),
+                    Err(e) => eprintln!("Warning: Failed to initialize music player: {}", e),
+                }
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             greet,
+            core::commands::list_libraries,
+            core::commands::get_current_library,
+            core::commands::create_library,
+            core::commands::set_current_library,
+            core::commands::delete_library,
+            core::commands::rename_library,
             modules::novel::commands::preview_import,
             modules::novel::commands::import_novel,
             modules::novel::commands::list_books,
@@ -101,6 +114,7 @@ pub fn run() {
             modules::novel::commands::seed_categories,
             modules::novel::commands::fetch_book_metadata,
             modules::novel::commands::delete_book,
+            modules::novel::commands::extract_archive_txt,
             modules::ai::commands::check_ollama_status,
             modules::ai::commands::test_ollama_generate,
             modules::ai::commands::create_conversation,
@@ -111,16 +125,37 @@ pub fn run() {
             modules::ai::commands::index_chapter,
             modules::ai::commands::index_book,
             modules::ai::commands::semantic_search,
+            modules::ai::commands::assistant_chat,
             modules::epub::commands::import_epub,
             modules::epub::commands::batch_import_epub,
             modules::epub::commands::get_epub_book,
             modules::epub::commands::list_epub_books,
+            modules::epub::commands::list_epub_books_with_details,
             modules::epub::commands::search_epub_books,
             modules::epub::commands::delete_epub_book,
             modules::epub::commands::update_epub_metadata,
             modules::epub::commands::set_epub_book_authors,
             modules::epub::commands::set_epub_book_tags,
             modules::epub::commands::update_epub_cover,
+            modules::epub::commands::get_epub_chapters,
+            modules::epub::commands::get_epub_chapter_content,
+            modules::music::commands::scan_music_folder,
+            modules::music::commands::get_all_tracks,
+            modules::music::commands::get_tracks_by_artist,
+            modules::music::commands::get_tracks_by_album,
+            modules::music::commands::get_tracks_by_genre,
+            modules::music::commands::search_tracks,
+            modules::music::commands::get_all_artists,
+            modules::music::commands::get_all_albums,
+            modules::music::commands::increment_play_count,
+            modules::music::commands::update_track_rating,
+            modules::music::commands::delete_track,
+            modules::music::commands::play_track,
+            modules::music::commands::pause_playback,
+            modules::music::commands::resume_playback,
+            modules::music::commands::stop_playback,
+            modules::music::commands::set_volume,
+            modules::music::commands::get_player_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

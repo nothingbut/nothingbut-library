@@ -216,3 +216,84 @@ pub struct SearchResult {
     pub similarity: f32, // 0.0 - 1.0
     pub preview: String, // 章节预览（前200字）
 }
+
+// ==================== AI 助手工具调用 ====================
+
+/// 工具参数定义
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolParameter {
+    #[serde(rename = "type")]
+    pub param_type: String,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#enum: Option<Vec<String>>,
+}
+
+/// 工具函数定义
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolFunction {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
+}
+
+/// 工具定义
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tool {
+    #[serde(rename = "type")]
+    pub tool_type: String,
+    pub function: ToolFunction,
+}
+
+/// 工具调用请求（由 LLM 返回）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub call_type: String,
+    pub function: FunctionCall,
+}
+
+/// 函数调用详情
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FunctionCall {
+    pub name: String,
+    pub arguments: String, // JSON 字符串
+}
+
+/// 工具调用结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolResult {
+    pub tool_call_id: String,
+    pub output: String,
+}
+
+/// 带工具调用的聊天请求（扩展版）
+#[derive(Debug, Clone, Serialize)]
+pub struct ChatRequestWithTools {
+    pub model: String,
+    pub messages: Vec<ChatMessage>,
+    pub stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Tool>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options: Option<GenerateOptions>,
+}
+
+/// 带工具调用的聊天响应
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChatResponseWithTools {
+    pub model: String,
+    pub created_at: String,
+    pub message: ChatMessageWithTools,
+    pub done: bool,
+}
+
+/// 带工具调用的消息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatMessageWithTools {
+    pub role: MessageRole,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+}

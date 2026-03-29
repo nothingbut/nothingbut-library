@@ -1,5 +1,5 @@
 use crate::errors::AppResult;
-use super::{database, models::*, vector, OllamaClient, DEFAULT_CHAT_MODEL, DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_URL};
+use super::{assistant, database, models::*, vector, OllamaClient, DEFAULT_CHAT_MODEL, DEFAULT_EMBEDDING_MODEL, DEFAULT_OLLAMA_URL};
 use sqlx::{SqlitePool, Row};
 use tauri::{AppHandle, Emitter, State};
 use futures::StreamExt;
@@ -319,6 +319,193 @@ async fn get_chapter_preview(pool: &SqlitePool, chapter_id: i64) -> AppResult<St
     let content: String = row.get("content");
     let preview: String = content.chars().take(200).collect();
     Ok(preview)
+}
+
+// ==================== AI 助手命令 ====================
+
+/// AI 助手对话（简化版本，不依赖原生 function calling）
+#[tauri::command]
+pub async fn assistant_chat(
+    pool: State<'_, SqlitePool>,
+    user_message: String,
+    conversation_history: Option<Vec<ChatMessage>>,
+) -> AppResult<AssistantResponse> {
+    // 获取信号量许可
+    let _permit = super::AI_REQUEST_SEMAPHORE.acquire().await
+        .map_err(|e| crate::errors::AppError::Module(format!("Failed to acquire semaphore: {}", e)))?;
+
+    // 构建消息历史
+    let mut messages = conversation_history.unwrap_or_else(|| {
+        vec![ChatMessage {
+            role: MessageRole::System,
+            content: r#"你是一个智能助手，帮助用户管理图书馆和音乐库。
+
+可用命令：
+1. "列出所有库" - 显示所有库
+2. "切换到[库名]" - 切换到指定的库
+3. "搜索[书名/作者]" - 搜索书籍
+4. "播放[歌名/歌手]" - 搜索并播放音乐
+
+请用简洁友好的中文回复，并在需要时直接执行相应操作。"#.to_string(),
+        }]
+    });
+
+    // 添加用户消息
+    messages.push(ChatMessage {
+        role: MessageRole::User,
+        content: user_message.clone(),
+    });
+
+    // 调用 Ollama（普通聊天）
+    let client = OllamaClient::new(DEFAULT_OLLAMA_URL.to_string());
+
+    // 先检测用户意图并执行相应工具
+    let tool_result = detect_and_execute_tool(&pool, &user_message).await;
+
+    if let Some((tool_name, result)) = tool_result {
+        // 有工具执行结果，添加到上下文
+        messages.push(ChatMessage {
+            role: MessageRole::System,
+            content: format!("工具 {} 执行结果:\n{}", tool_name, result),
+        });
+    }
+
+    // 生成AI响应
+    let response = client.chat(messages.clone(), DEFAULT_CHAT_MODEL).await?;
+
+    // 保存助手响应到历史
+    messages.push(ChatMessage {
+        role: MessageRole::Assistant,
+        content: response.clone(),
+    });
+
+    Ok(AssistantResponse {
+        message: response,
+        tool_calls: None,
+        tool_results: None,
+        conversation_history: messages,
+    })
+}
+
+/// 检测用户意图并执行相应工具（简单的关键词匹配）
+async fn detect_and_execute_tool(
+    pool: &SqlitePool,
+    user_message: &str,
+) -> Option<(String, String)> {
+    let msg_lower = user_message.to_lowercase();
+
+    // 列出所有库
+    if msg_lower.contains("列出") && (msg_lower.contains("库") || msg_lower.contains("library")) {
+        match assistant::execute_tool(pool, "list_libraries", serde_json::json!({})).await {
+            Ok(result) => return Some(("list_libraries".to_string(), result)),
+            Err(e) => return Some(("list_libraries".to_string(), format!("错误: {}", e))),
+        }
+    }
+
+    // 获取当前库
+    if msg_lower.contains("当前") && msg_lower.contains("库") {
+        match assistant::execute_tool(pool, "get_current_library", serde_json::json!({})).await {
+            Ok(result) => return Some(("get_current_library".to_string(), result)),
+            Err(e) => return Some(("get_current_library".to_string(), format!("错误: {}", e))),
+        }
+    }
+
+    // 切换库 - 必须包含"库"字，避免误触发
+    if (msg_lower.contains("切换") || msg_lower.contains("打开")) && msg_lower.contains("库") {
+        // 尝试多种模式提取库名
+        let library_name = if let Some(idx) = user_message.find("切换到") {
+            user_message[idx + "切换到".len()..].trim().to_string()
+        } else if let Some(idx) = user_message.find("打开") {
+            user_message[idx + "打开".len()..].trim().to_string()
+        } else if let Some(idx) = user_message.find("切换") {
+            // 处理 "切换XX库" 的情况
+            user_message[idx + "切换".len()..].trim().to_string()
+        } else if let Some(idx) = user_message.find("到") {
+            user_message[idx + "到".len()..].trim().to_string()
+        } else {
+            String::new()
+        };
+
+        let library_name = library_name.trim().to_string();
+
+        if !library_name.is_empty() {
+            eprintln!("🔍 检测到切换库命令，提取的库名: '{}'", library_name);
+
+            let args = serde_json::json!({
+                "library_name": library_name
+            });
+            match assistant::execute_tool(pool, "switch_library", args).await {
+                Ok(result) => {
+                    eprintln!("✅ 切换库成功: {}", result);
+                    return Some(("switch_library".to_string(), result));
+                },
+                Err(e) => {
+                    eprintln!("❌ 切换库失败: {}", e);
+                    return Some(("switch_library".to_string(), format!("错误: {}", e)));
+                }
+            }
+        } else {
+            eprintln!("⚠️ 提取的库名为空");
+        }
+    }
+
+    // 搜索书籍
+    if (msg_lower.contains("搜索") || msg_lower.contains("找")) &&
+       (msg_lower.contains("书") || msg_lower.contains("小说") || msg_lower.contains("epub")) {
+        // 提取搜索关键词
+        let mut query = user_message.to_string();
+
+        // 移除命令词
+        for word in &["搜索", "找", "找一下", "看看", "有没有", "小说", "书籍", "的书"] {
+            query = query.replace(word, "");
+        }
+
+        let query = query.trim().to_string();
+
+        if !query.is_empty() {
+            let args = serde_json::json!({
+                "query": query
+            });
+            match assistant::execute_tool(pool, "search_books", args).await {
+                Ok(result) => return Some(("search_books".to_string(), result)),
+                Err(e) => return Some(("search_books".to_string(), format!("错误: {}", e))),
+            }
+        }
+    }
+
+    // 播放音乐
+    if (msg_lower.contains("播放") || msg_lower.contains("听")) &&
+       (msg_lower.contains("歌") || msg_lower.contains("音乐")) {
+        let mut query = user_message.to_string();
+
+        // 移除命令词
+        for word in &["播放", "听", "听一下", "放", "的歌", "的音乐", "音乐", "歌曲"] {
+            query = query.replace(word, "");
+        }
+
+        let query = query.trim().to_string();
+
+        if !query.is_empty() {
+            let args = serde_json::json!({
+                "query": query
+            });
+            match assistant::execute_tool(pool, "search_tracks", args).await {
+                Ok(result) => return Some(("search_tracks".to_string(), result)),
+                Err(e) => return Some(("search_tracks".to_string(), format!("错误: {}", e))),
+            }
+        }
+    }
+
+    None
+}
+
+/// AI 助手响应
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AssistantResponse {
+    pub message: String,
+    pub tool_calls: Option<Vec<ToolCall>>,
+    pub tool_results: Option<Vec<ToolResult>>,
+    pub conversation_history: Vec<ChatMessage>,
 }
 
 #[cfg(test)]

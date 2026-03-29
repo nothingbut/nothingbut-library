@@ -250,6 +250,52 @@ impl OllamaClient {
 
         Ok(all_embeddings)
     }
+
+    /// 对话（带工具调用支持）
+    pub async fn chat_with_tools(
+        &self,
+        messages: Vec<ChatMessage>,
+        tools: Vec<Tool>,
+        model: &str,
+    ) -> AppResult<ChatResponseWithTools> {
+        let url = format!("{}/api/chat", self.base_url);
+
+        let request = ChatRequestWithTools {
+            model: model.to_string(),
+            messages,
+            stream: false,
+            tools: Some(tools),
+            options: Some(GenerateOptions {
+                temperature: Some(0.7),
+                top_p: Some(0.9),
+                top_k: None,
+            }),
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| AppError::Module(format!("Ollama chat with tools request failed: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(AppError::Module(format!(
+                "Ollama chat with tools API error ({}): {}",
+                status, error_text
+            )));
+        }
+
+        let chat_response: ChatResponseWithTools = response
+            .json()
+            .await
+            .map_err(|e| AppError::Module(format!("Failed to parse Ollama chat response: {}", e)))?;
+
+        Ok(chat_response)
+    }
 }
 
 #[cfg(test)]
