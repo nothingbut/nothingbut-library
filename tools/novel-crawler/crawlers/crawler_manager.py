@@ -287,8 +287,8 @@ class CrawlerManager:
                 self.logger.info(f"Reached end ID {end_id}")
                 break
 
-            # Check stop condition
-            if consecutive_failures >= self.config.MAX_CONSECUTIVE_FAILURES:
+            # Check stop condition (only when no end_id is specified)
+            if end_id is None and consecutive_failures >= self.config.MAX_CONSECUTIVE_FAILURES:
                 self.logger.warning(
                     f"Stopped after {self.config.MAX_CONSECUTIVE_FAILURES} consecutive failures"
                 )

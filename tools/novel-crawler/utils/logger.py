@@ -45,7 +45,7 @@ def setup_logger(name: str = 'novel_crawler') -> logging.Logger:
     # File handler - general log
     file_handler = RotatingFileHandler(
         settings.LOG_FILE,
-        maxBytes=10 * 1024 * 1024,  # 10MB
+        maxBytes=50 * 1024 * 1024,  # 50MB - reduces rotation frequency
         backupCount=5,
         encoding='utf-8'
     )
@@ -78,3 +78,21 @@ def get_logger(name: str) -> logging.Logger:
         Logger instance
     """
     return logging.getLogger(name)
+
+
+def shutdown_loggers():
+    """
+    Shutdown all loggers and close file handlers.
+
+    This should be called before program exit to ensure all file handles
+    are properly closed, especially important on Windows which locks files.
+    """
+    # Close all handlers for all loggers
+    for logger_name in list(logging.Logger.manager.loggerDict.keys()):
+        logger = logging.getLogger(logger_name)
+        for handler in logger.handlers[:]:
+            handler.close()
+            logger.removeHandler(handler)
+
+    # Also shutdown the root logger
+    logging.shutdown()

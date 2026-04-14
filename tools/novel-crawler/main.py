@@ -6,6 +6,7 @@ Novel Metadata Crawler - Main Entry Point
 import sys
 import argparse
 import logging
+import atexit
 
 from config import settings
 from crawlers.crawler_manager import CrawlerManager
@@ -13,10 +14,13 @@ from crawlers.source_crawler_manager import SourceCrawlerManager
 from database.db_manager import DatabaseManager
 from scheduler.job_manager import JobManager
 from scheduler.daily_task import DailyTask
-from utils.logger import setup_logger
+from utils.logger import setup_logger, shutdown_loggers
 
 # Setup logging
 logger = setup_logger('main')
+
+# Register cleanup on exit (important for Windows file locking)
+atexit.register(shutdown_loggers)
 
 
 def print_banner():
