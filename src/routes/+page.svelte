@@ -16,9 +16,10 @@
   }
 
   const modules: Module[] = [
-    { id: 'novel', name: '网络小说', icon: '📚', available: true },
-    { id: 'epub', name: '电子书', icon: '📖', available: true },
-    { id: 'music', name: '音乐库', icon: '🎵', available: false },
+    { id: 'novel', name: '（测试）网络小说库', icon: '📚', available: true },
+    { id: 'epub', name: '（测试）电子书库', icon: '📖', available: true },
+    { id: 'music', name: '（测试）音乐库', icon: '🎵', available: true },
+    { id: 'bilibili', name: 'B站音频', icon: '📺', available: true },
     { id: 'note', name: '笔记', icon: '📝', available: false },
   ];
 

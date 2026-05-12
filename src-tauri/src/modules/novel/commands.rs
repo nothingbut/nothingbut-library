@@ -67,6 +67,8 @@ pub async fn preview_import(
 pub async fn import_novel(
     pool: State<'_, SqlitePool>,
     #[allow(non_snake_case)]
+    libraryId: i64,
+    #[allow(non_snake_case)]
     workspacePath: String,
     #[allow(non_snake_case)]
     filePath: String,
@@ -107,6 +109,7 @@ pub async fn import_novel(
     // Insert book into database first to get the ID
     let book_id = database::insert_book(
         &pool,
+        libraryId,
         &title,
         author.as_deref(),
         description.as_deref(),
@@ -169,8 +172,12 @@ pub async fn import_novel(
 
 /// List all books
 #[tauri::command]
-pub async fn list_books(pool: State<'_, SqlitePool>) -> AppResult<Vec<NovelBook>> {
-    database::list_books(&pool).await
+pub async fn list_books(
+    pool: State<'_, SqlitePool>,
+    #[allow(non_snake_case)]
+    libraryId: i64,
+) -> AppResult<Vec<NovelBook>> {
+    database::list_books(&pool, libraryId).await
 }
 
 /// List chapters by book_id
@@ -187,19 +194,25 @@ pub async fn list_chapters(
 #[tauri::command]
 pub async fn create_category(
     pool: State<'_, SqlitePool>,
+    #[allow(non_snake_case)]
+    libraryId: i64,
     name: String,
     #[allow(non_snake_case)]
     parentId: Option<i64>,
     #[allow(non_snake_case)]
     sortOrder: i32,
 ) -> AppResult<i64> {
-    database::insert_category(&pool, &name, parentId, sortOrder).await
+    database::insert_category(&pool, libraryId, &name, parentId, sortOrder).await
 }
 
-/// List all categories
+/// List all categories for a specific library
 #[tauri::command]
-pub async fn list_categories(pool: State<'_, SqlitePool>) -> AppResult<Vec<NovelCategory>> {
-    database::list_categories(&pool).await
+pub async fn list_categories(
+    pool: State<'_, SqlitePool>,
+    #[allow(non_snake_case)]
+    libraryId: i64,
+) -> AppResult<Vec<NovelCategory>> {
+    database::list_categories(&pool, libraryId).await
 }
 
 /// Get chapter content by reading from file
@@ -241,10 +254,12 @@ pub async fn get_chapter_content(
 pub async fn seed_categories(
     pool: State<'_, SqlitePool>,
     #[allow(non_snake_case)]
+    libraryId: i64,
+    #[allow(non_snake_case)]
     configPath: String,
 ) -> AppResult<usize> {
     let path = Path::new(&configPath);
-    super::seed::seed_categories_from_config(&pool, path).await
+    super::seed::seed_categories_from_config(&pool, libraryId, path).await
 }
 
 /// Fetch book metadata from source website
@@ -303,6 +318,8 @@ pub async fn fetch_book_metadata(
 pub async fn delete_book(
     pool: State<'_, SqlitePool>,
     #[allow(non_snake_case)]
+    libraryId: i64,
+    #[allow(non_snake_case)]
     workspacePath: String,
     #[allow(non_snake_case)]
     bookId: i64,
@@ -310,7 +327,7 @@ pub async fn delete_book(
     let workspace = Path::new(&workspacePath);
 
     // Get book info first
-    let books = database::list_books(&pool).await?;
+    let books = database::list_books(&pool, libraryId).await?;
     let book = books.iter().find(|b| b.id == bookId)
         .ok_or_else(|| crate::AppError::NotFound(format!("Book {} not found", bookId)))?;
 
@@ -325,4 +342,26 @@ pub async fn delete_book(
     database::delete_book(&pool, bookId).await?;
 
     Ok(())
+}
+
+/// Extract single TXT file from archive (zip, 7z)
+/// Returns the path to the extracted TXT file
+#[tauri::command]
+pub async fn extract_archive_txt(
+    #[allow(non_snake_case)]
+    archivePath: String,
+) -> AppResult<String> {
+    use super::archive;
+
+    // Create temporary directory for extraction
+    let temp_dir = std::env::temp_dir().join(format!("nothingbut_extract_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    ));
+
+    let extracted_path = archive::extract_single_txt_from_archive(&archivePath, &temp_dir)?;
+
+    Ok(extracted_path.to_string_lossy().to_string())
 }

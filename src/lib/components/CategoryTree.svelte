@@ -5,10 +5,11 @@
 
   // Props
   interface Props {
+    libraryId: number;
     onSelectBook?: (bookId: number) => void;
   }
 
-  let { onSelectBook }: Props = $props();
+  let { libraryId, onSelectBook }: Props = $props();
 
   // Types
   interface TreeNode {
@@ -36,6 +37,7 @@
   let tree = $state<TreeNode[]>([]);
   let selectedId = $state<string | number | null>(null);
   let loading = $state(true);
+  let deleting = $state(false);
   let error = $state<string | null>(null);
   let contextMenu = $state<ContextMenuState>({
     visible: false,
@@ -55,8 +57,8 @@
 
       // Load data from API
       const [categories, books] = await Promise.all([
-        listCategories(),
-        listBooks()
+        listCategories(libraryId),
+        listBooks(libraryId)
       ]);
 
       // Build category map for easy lookup
@@ -207,6 +209,12 @@
       return;
     }
 
+    // Prevent multiple deletions
+    if (deleting) {
+      hideContextMenu();
+      return;
+    }
+
     const bookName = contextMenu.node.name;
     const bookId = contextMenu.node.bookId;
 
@@ -216,8 +224,9 @@
       return;
     }
 
+    deleting = true;
     try {
-      await deleteBook(workspacePath, bookId);
+      await deleteBook(libraryId, workspacePath, bookId);
 
       // Reload tree
       await loadTree();
@@ -230,11 +239,12 @@
         }
       }
 
-      alert('删除成功');
+      // No success alert - tree refresh provides visual feedback
     } catch (e) {
       console.error('Failed to delete book:', e);
       alert('删除失败: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
+      deleting = false;
       hideContextMenu();
     }
   }
@@ -318,9 +328,9 @@
     style="left: {contextMenu.x}px; top: {contextMenu.y}px;"
     onclick={(e) => e.stopPropagation()}
   >
-    <button class="context-menu-item danger" onclick={handleDeleteBook}>
+    <button class="context-menu-item danger" onclick={handleDeleteBook} disabled={deleting}>
       <span class="menu-icon">🗑️</span>
-      <span>删除小说</span>
+      <span>{deleting ? '删除中...' : '删除小说'}</span>
     </button>
   </div>
 {/if}
@@ -489,6 +499,19 @@
 
   .context-menu-item.danger:hover {
     background-color: #dc35451a;
+  }
+
+  .context-menu-item:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .context-menu-item:disabled:hover {
+    background-color: transparent;
+  }
+
+  .context-menu-item.danger:disabled:hover {
+    background-color: transparent;
   }
 
   .menu-icon {

@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# EPUB Library Startup Script
+# NothingBut Library Startup Script
 # Starts the Tauri development server
 
 echo "========================================"
-echo "  EPUB Library - Development Mode"
+echo "  NothingBut Library - Dev Mode"
 echo "========================================"
 echo ""
 
@@ -29,9 +29,12 @@ if ! command -v cargo &> /dev/null; then
     exit 1
 fi
 
-echo "Starting EPUB Library..."
-echo "Frontend: http://localhost:1420"
-echo "EPUB Route: http://localhost:1420/epub"
+echo "Starting NothingBut Library..."
+echo ""
+echo "🏠 Homepage:   http://localhost:1420"
+echo "📚 Novel:      http://localhost:1420/novel"
+echo "📖 EPUB:       http://localhost:1420/epub"
+echo "🎵 Music:      http://localhost:1420/music"
 echo ""
 echo "Press Ctrl+C to stop"
 echo ""

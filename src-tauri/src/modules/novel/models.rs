@@ -38,6 +38,7 @@ impl BookStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NovelCategory {
     pub id: i64,
+    pub library_id: i64,
     pub name: String,
     pub parent_id: Option<i64>,
     pub sort_order: i32,
@@ -147,6 +148,7 @@ mod tests {
     fn test_novel_category_serialization() {
         let category = NovelCategory {
             id: 1,
+            library_id: 1,
             name: "Fantasy".to_string(),
             parent_id: None,
             sort_order: 0,

@@ -2,6 +2,7 @@ export type BookStatus = 'completed' | 'ongoing' | 'abandoned';
 
 export interface Category {
 	id: number;
+	library_id: number;
 	name: string;
 	parent_id: number | null;
 	sort_order: number;

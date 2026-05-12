@@ -87,6 +87,9 @@ pub fn run() {
                 // Store pool in app state
                 app_handle.manage(pool);
 
+                // Initialize bilibili download state
+                app_handle.manage(modules::bilibili::downloader::new_shared_state());
+
                 // Initialize music player
                 println!("Initializing music player...");
                 match modules::music::player::init_player() {
@@ -156,6 +159,27 @@ pub fn run() {
             modules::music::commands::stop_playback,
             modules::music::commands::set_volume,
             modules::music::commands::get_player_state,
+            modules::bilibili::commands::bilibili_generate_qrcode,
+            modules::bilibili::commands::bilibili_poll_qrcode,
+            modules::bilibili::commands::bilibili_get_account,
+            modules::bilibili::commands::bilibili_logout,
+            modules::bilibili::commands::bilibili_check_cookie,
+            modules::bilibili::commands::bilibili_refresh_cookie,
+            modules::bilibili::commands::bilibili_add_uploader,
+            modules::bilibili::commands::bilibili_list_uploaders,
+            modules::bilibili::commands::bilibili_remove_uploader,
+            modules::bilibili::commands::bilibili_sync_videos,
+            modules::bilibili::commands::bilibili_list_videos,
+            modules::bilibili::commands::bilibili_search_videos,
+            modules::bilibili::commands::bilibili_check_ytdlp,
+            modules::bilibili::commands::bilibili_start_download,
+            modules::bilibili::commands::bilibili_get_download_progress,
+            modules::bilibili::commands::bilibili_list_downloads,
+            modules::bilibili::commands::bilibili_retry_download,
+            modules::bilibili::commands::bilibili_cancel_download,
+            modules::bilibili::commands::bilibili_get_settings,
+            modules::bilibili::commands::bilibili_set_download_dir,
+            modules::bilibili::commands::bilibili_set_audio_format,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

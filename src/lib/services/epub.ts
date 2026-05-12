@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
 	EpubBook,
 	EpubBookWithDetails,
+	EpubChapter,
 	SearchQuery,
 	ImportResult,
 } from '$lib/types/epub';
@@ -44,20 +45,24 @@ export class EpubService {
 
 	/**
 	 * 导入单个 EPUB 文件
+	 * @param libraryId - 库 ID
 	 * @param workspacePath - 工作空间路径
 	 * @param sourceFilePath - EPUB 文件路径
 	 * @returns 新导入的书籍 ID
 	 * @throws Error if validation fails or import operation fails
 	 */
 	static async importEpub(
+		libraryId: number,
 		workspacePath: string,
 		sourceFilePath: string
 	): Promise<number> {
 		try {
+			this.validatePositiveNumber(libraryId, 'libraryId');
 			this.validateNonEmptyString(workspacePath, 'workspacePath');
 			this.validateNonEmptyString(sourceFilePath, 'sourceFilePath');
 
 			return await invoke<number>('import_epub', {
+				libraryId,
 				workspacePath,
 				sourceFilePath,
 			});
@@ -69,20 +74,24 @@ export class EpubService {
 
 	/**
 	 * 批量导入 EPUB 文件
+	 * @param libraryId - 库 ID
 	 * @param workspacePath - 工作空间路径
 	 * @param filePaths - EPUB 文件路径数组
 	 * @returns 导入结果数组
 	 * @throws Error if validation fails or import operation fails
 	 */
 	static async batchImportEpub(
+		libraryId: number,
 		workspacePath: string,
 		filePaths: string[]
 	): Promise<ImportResult[]> {
 		try {
+			this.validatePositiveNumber(libraryId, 'libraryId');
 			this.validateNonEmptyString(workspacePath, 'workspacePath');
 			this.validateNonEmptyArray<string>(filePaths, 'filePaths');
 
 			return await invoke<ImportResult[]>('batch_import_epub', {
+				libraryId,
 				workspacePath,
 				filePaths,
 			});
@@ -122,6 +131,22 @@ export class EpubService {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Failed to fetch books';
 			throw new Error(`Failed to fetch books: ${message}`);
+		}
+	}
+
+	/**
+	 * 列出所有书籍（包含作者和标签详情）
+	 * @param libraryId - 库 ID
+	 * @returns 书籍详情数组
+	 * @throws Error if operation fails
+	 */
+	static async listBooksWithDetails(libraryId: number): Promise<EpubBookWithDetails[]> {
+		try {
+			this.validatePositiveNumber(libraryId, 'libraryId');
+			return await invoke<EpubBookWithDetails[]>('list_epub_books_with_details', { libraryId });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Failed to fetch books with details';
+			throw new Error(`Failed to fetch books with details: ${message}`);
 		}
 	}
 
@@ -284,6 +309,45 @@ export class EpubService {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Failed to update cover';
 			throw new Error(`Failed to update cover: ${message}`);
+		}
+	}
+
+	/**
+	 * 获取 EPUB 书籍的章节列表
+	 * @param bookId - 书籍 ID
+	 * @returns 章节列表
+	 * @throws Error if validation fails or fetch operation fails
+	 */
+	static async getChapters(bookId: number): Promise<EpubChapter[]> {
+		try {
+			this.validatePositiveNumber(bookId, 'bookId');
+
+			return await invoke<EpubChapter[]>('get_epub_chapters', { bookId });
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Failed to fetch chapters';
+			throw new Error(`Failed to fetch chapters: ${message}`);
+		}
+	}
+
+	/**
+	 * 获取 EPUB 书籍的章节内容
+	 * @param bookId - 书籍 ID
+	 * @param chapterHref - 章节 href（从章节列表获取）
+	 * @returns 章节内容（HTML 格式）
+	 * @throws Error if validation fails or fetch operation fails
+	 */
+	static async getChapterContent(bookId: number, chapterHref: string): Promise<string> {
+		try {
+			this.validatePositiveNumber(bookId, 'bookId');
+			this.validateNonEmptyString(chapterHref, 'chapterHref');
+
+			return await invoke<string>('get_epub_chapter_content', {
+				bookId,
+				chapterHref,
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Failed to fetch chapter content';
+			throw new Error(`Failed to fetch chapter content: ${message}`);
 		}
 	}
 }

@@ -6,17 +6,23 @@
 
 	interface Props {
 		isOpen?: boolean;
+		libraryId: number;
 		onClose: () => void;
 		onSuccess: () => void;
 	}
 
-	let { isOpen = $bindable(false), onClose, onSuccess }: Props = $props();
+	// Extended import result with file path for display
+	type DisplayImportResult =
+		| { type: 'success'; book_id: number; file_path: string }
+		| { type: 'failed'; file_path: string; error: string };
+
+	let { isOpen = $bindable(false), libraryId, onClose, onSuccess }: Props = $props();
 
 	// State
 	let importing = $state(false);
 	let error = $state<string | null>(null);
 	let selectedFiles = $state<string[]>([]);
-	let importResults = $state<ImportResult[]>([]);
+	let importResults = $state<DisplayImportResult[]>([]);
 	let showResults = $state(false);
 
 	/**
@@ -65,7 +71,7 @@
 
 			if (selectedFiles.length === 1) {
 				// Single file import
-				const bookId = await EpubService.importEpub(workspace.path, selectedFiles[0]);
+				const bookId = await EpubService.importEpub(libraryId, workspace.path, selectedFiles[0]);
 				importResults = [
 					{
 						type: 'success',
@@ -75,7 +81,19 @@
 				];
 			} else {
 				// Batch import
-				importResults = await EpubService.batchImportEpub(workspace.path, selectedFiles);
+				const results = await EpubService.batchImportEpub(libraryId, workspace.path, selectedFiles);
+				// Map results to include file_path for success results
+				importResults = results.map((result, index): DisplayImportResult => {
+					if (result.type === 'success') {
+						return {
+							type: 'success',
+							book_id: result.book_id,
+							file_path: selectedFiles[index],
+						};
+					} else {
+						return result;
+					}
+				});
 			}
 
 			showResults = true;

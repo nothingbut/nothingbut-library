@@ -21,6 +21,7 @@
 	let book = $state<Book | null>(null);
 	let chapters = $state<Chapter[]>([]);
 	let currentChapter = $state<Chapter | null>(null);
+	let showChapterList = $state(true);
 	let bookId = $page.params.bookId;
 
 	function loadBook() {
@@ -84,15 +85,28 @@
 	onMount(() => {
 		loadBook();
 		loadChapters();
+
+		// 监听目录切换事件
+		const handleToggleSidebar = () => {
+			showChapterList = !showChapterList;
+			console.log('[Reader Page] Toggle chapter list:', showChapterList);
+		};
+		window.addEventListener('toggle-reader-sidebar', handleToggleSidebar);
+
+		return () => {
+			window.removeEventListener('toggle-reader-sidebar', handleToggleSidebar);
+		};
 	});
 </script>
 
 <div class="reader-page">
-	<ChapterList
-		{chapters}
-		currentChapterId={currentChapter?.id ?? null}
-		onSelectChapter={handleSelectChapter}
-	/>
+	{#if showChapterList}
+		<ChapterList
+			{chapters}
+			currentChapterId={currentChapter?.id ?? null}
+			onSelectChapter={handleSelectChapter}
+		/>
+	{/if}
 	<Reader chapter={currentChapter} bookDir={book?.directory ?? ''} />
 </div>
 

@@ -25,6 +25,7 @@ struct BsConfig {
 /// Returns the number of categories inserted (main + subcategories).
 pub async fn seed_categories_from_config(
     pool: &SqlitePool,
+    library_id: i64,
     config_path: &Path,
 ) -> AppResult<usize> {
     // Read and parse bsconfig.json
@@ -34,14 +35,15 @@ pub async fn seed_categories_from_config(
     let config: BsConfig = serde_json::from_str(&content)
         .map_err(|e| AppError::Json(format!("Failed to parse config file: {}", e)))?;
 
-    // Check if categories already exist
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM novel_categories")
+    // Check if categories already exist for this library
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM novel_categories WHERE library_id = ?")
+        .bind(library_id)
         .fetch_one(pool)
         .await
         .map_err(|e| AppError::Database(format!("Failed to check existing categories: {}", e)))?;
 
     if count > 0 {
-        return Ok(0); // Categories already seeded
+        return Ok(0); // Categories already seeded for this library
     }
 
     let mut inserted_count = 0;
@@ -51,6 +53,7 @@ pub async fn seed_categories_from_config(
         // Insert main category
         let parent_id = super::database::insert_category(
             pool,
+            library_id,
             &cat_data.category,
             None,
             sort_order as i32,
@@ -62,6 +65,7 @@ pub async fn seed_categories_from_config(
         for (sub_sort_order, subcat) in cat_data.subcategories.into_iter().enumerate() {
             super::database::insert_category(
                 pool,
+                library_id,
                 &subcat,
                 Some(parent_id),
                 sub_sort_order as i32,
@@ -92,6 +96,7 @@ mod tests {
             r#"
             CREATE TABLE novel_categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                library_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
                 parent_id INTEGER,
                 sort_order INTEGER NOT NULL DEFAULT 0,
@@ -131,7 +136,7 @@ mod tests {
         let pool = setup_test_db().await;
         let config_file = create_test_config();
 
-        let count = seed_categories_from_config(&pool, config_file.path())
+        let count = seed_categories_from_config(&pool, 1, config_file.path())
             .await
             .unwrap();
 
@@ -139,7 +144,7 @@ mod tests {
         assert_eq!(count, 6);
 
         // Verify categories were inserted correctly
-        let categories = super::super::database::list_categories(&pool)
+        let categories = super::super::database::list_categories(&pool, 1)
             .await
             .unwrap();
 
@@ -168,19 +173,19 @@ mod tests {
         let config_file = create_test_config();
 
         // First seeding
-        let count1 = seed_categories_from_config(&pool, config_file.path())
+        let count1 = seed_categories_from_config(&pool, 1, config_file.path())
             .await
             .unwrap();
         assert_eq!(count1, 6);
 
         // Second seeding should return 0 (no duplicates)
-        let count2 = seed_categories_from_config(&pool, config_file.path())
+        let count2 = seed_categories_from_config(&pool, 1, config_file.path())
             .await
             .unwrap();
         assert_eq!(count2, 0);
 
         // Should still have only 6 categories
-        let categories = super::super::database::list_categories(&pool)
+        let categories = super::super::database::list_categories(&pool, 1)
             .await
             .unwrap();
         assert_eq!(categories.len(), 6);
@@ -189,7 +194,7 @@ mod tests {
     #[tokio::test]
     async fn test_seed_categories_invalid_path() {
         let pool = setup_test_db().await;
-        let result = seed_categories_from_config(&pool, Path::new("/nonexistent/path.json"))
+        let result = seed_categories_from_config(&pool, 1, Path::new("/nonexistent/path.json"))
             .await;
 
         assert!(result.is_err());
@@ -207,7 +212,7 @@ mod tests {
         file.write_all(b"{ invalid json }").unwrap();
         file.flush().unwrap();
 
-        let result = seed_categories_from_config(&pool, file.path()).await;
+        let result = seed_categories_from_config(&pool, 1, file.path()).await;
 
         assert!(result.is_err());
         match result {

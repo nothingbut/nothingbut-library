@@ -6,6 +6,7 @@ use super::models::{BookStatus, NovelBook, NovelCategory, NovelChapter};
 /// Insert a book into the database
 pub async fn insert_book(
     pool: &SqlitePool,
+    library_id: i64,
     title: &str,
     author: Option<&str>,
     description: Option<&str>,
@@ -24,13 +25,14 @@ pub async fn insert_book(
     let result = sqlx::query(
         r#"
         INSERT INTO novel_books (
-            title, author, description, cover_path, category_id, source_site,
+            library_id, title, author, description, cover_path, category_id, source_site,
             book_dir, file_size, word_count, chapter_count, status,
             created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
     )
+    .bind(library_id)
     .bind(title)
     .bind(author)
     .bind(description)
@@ -51,8 +53,8 @@ pub async fn insert_book(
     Ok(result.last_insert_rowid())
 }
 
-/// List all books
-pub async fn list_books(pool: &SqlitePool) -> AppResult<Vec<NovelBook>> {
+/// List all books in a library
+pub async fn list_books(pool: &SqlitePool, library_id: i64) -> AppResult<Vec<NovelBook>> {
     let rows = sqlx::query(
         r#"
         SELECT
@@ -60,9 +62,11 @@ pub async fn list_books(pool: &SqlitePool) -> AppResult<Vec<NovelBook>> {
             book_dir, file_size, word_count, chapter_count, status,
             reading_progress, last_read_at, created_at, updated_at
         FROM novel_books
+        WHERE library_id = ?
         ORDER BY updated_at DESC
         "#,
     )
+    .bind(library_id)
     .fetch_all(pool)
     .await
     .map_err(|e| AppError::Database(format!("Failed to list books: {}", e)))?;
@@ -222,6 +226,7 @@ pub async fn list_chapters(pool: &SqlitePool, book_id: i64) -> AppResult<Vec<Nov
 /// Insert a category into the database
 pub async fn insert_category(
     pool: &SqlitePool,
+    library_id: i64,
     name: &str,
     parent_id: Option<i64>,
     sort_order: i32,
@@ -230,10 +235,11 @@ pub async fn insert_category(
 
     let result = sqlx::query(
         r#"
-        INSERT INTO novel_categories (name, parent_id, sort_order, created_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO novel_categories (library_id, name, parent_id, sort_order, created_at)
+        VALUES (?, ?, ?, ?, ?)
         "#,
     )
+    .bind(library_id)
     .bind(name)
     .bind(parent_id)
     .bind(sort_order)
@@ -245,15 +251,17 @@ pub async fn insert_category(
     Ok(result.last_insert_rowid())
 }
 
-/// List all categories
-pub async fn list_categories(pool: &SqlitePool) -> AppResult<Vec<NovelCategory>> {
+/// List all categories for a specific library
+pub async fn list_categories(pool: &SqlitePool, library_id: i64) -> AppResult<Vec<NovelCategory>> {
     let rows = sqlx::query(
         r#"
-        SELECT id, name, parent_id, sort_order, created_at
+        SELECT id, library_id, name, parent_id, sort_order, created_at
         FROM novel_categories
+        WHERE library_id = ?
         ORDER BY sort_order ASC
         "#,
     )
+    .bind(library_id)
     .fetch_all(pool)
     .await
     .map_err(|e| AppError::Database(format!("Failed to list categories: {}", e)))?;
@@ -268,6 +276,7 @@ pub async fn list_categories(pool: &SqlitePool) -> AppResult<Vec<NovelCategory>>
 
             NovelCategory {
                 id: row.get("id"),
+                library_id: row.get("library_id"),
                 name: row.get("name"),
                 parent_id: row.get("parent_id"),
                 sort_order: row.get("sort_order"),
@@ -370,6 +379,7 @@ mod tests {
 
         let book_id = insert_book(
             &pool,
+            1,
             "Test Book",
             Some("Test Author"),
             Some("Test description"),
@@ -387,7 +397,7 @@ mod tests {
 
         assert_eq!(book_id, 1);
 
-        let books = list_books(&pool).await.unwrap();
+        let books = list_books(&pool, 1).await.unwrap();
         assert_eq!(books.len(), 1);
         assert_eq!(books[0].title, "Test Book");
         assert_eq!(books[0].author, Some("Test Author".to_string()));
@@ -402,6 +412,7 @@ mod tests {
 
         let book_id = insert_book(
             &pool,
+            1,
             "Test Book",
             None,
             None,
@@ -458,17 +469,17 @@ mod tests {
     async fn test_insert_and_list_categories() {
         let pool = setup_test_db().await;
 
-        let cat_id1 = insert_category(&pool, "Fantasy", None, 0)
+        let cat_id1 = insert_category(&pool, 1, "Fantasy", None, 0)
             .await
             .unwrap();
-        let cat_id2 = insert_category(&pool, "Sci-Fi", None, 1)
+        let cat_id2 = insert_category(&pool, 1, "Sci-Fi", None, 1)
             .await
             .unwrap();
 
         assert_eq!(cat_id1, 1);
         assert_eq!(cat_id2, 2);
 
-        let categories = list_categories(&pool).await.unwrap();
+        let categories = list_categories(&pool, 1).await.unwrap();
         assert_eq!(categories.len(), 2);
         assert_eq!(categories[0].name, "Fantasy");
         assert_eq!(categories[0].sort_order, 0);

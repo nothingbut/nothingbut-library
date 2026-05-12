@@ -17,18 +17,19 @@ impl EpubDatabase {
     // ==================== 书籍 CRUD 操作 ====================
 
     /// 创建新书籍
-    pub async fn create_book(&self, book: &EpubBook) -> AppResult<i64> {
+    pub async fn create_book(&self, library_id: i64, book: &EpubBook) -> AppResult<i64> {
         let timestamp = Utc::now().timestamp();
 
         let result = sqlx::query(
             r#"
             INSERT INTO epub_books (
-                title, sort_title, isbn, publisher, pubdate, language,
+                library_id, title, sort_title, isbn, publisher, pubdate, language,
                 series, series_index, rating, file_path, file_size,
                 cover_path, description, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
+        .bind(library_id)
         .bind(&book.title)
         .bind(&book.sort_title)
         .bind(&book.isbn)
@@ -72,16 +73,18 @@ impl EpubDatabase {
     }
 
     /// 列出所有书籍
-    pub async fn list_books(&self) -> AppResult<Vec<EpubBook>> {
+    pub async fn list_books(&self, library_id: i64) -> AppResult<Vec<EpubBook>> {
         let rows = sqlx::query(
             r#"
             SELECT id, title, sort_title, isbn, publisher, pubdate, language,
                    series, series_index, rating, file_path, file_size,
                    cover_path, description, created_at, updated_at
             FROM epub_books
+            WHERE library_id = ?
             ORDER BY created_at DESC
             "#,
         )
+        .bind(library_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -356,7 +359,7 @@ impl EpubDatabase {
     // ==================== 搜索功能 ====================
 
     /// 搜索书籍（支持多条件过滤和排序）
-    pub async fn search_books(&self, query: &SearchQuery) -> AppResult<Vec<EpubBook>> {
+    pub async fn search_books(&self, library_id: i64, query: &SearchQuery) -> AppResult<Vec<EpubBook>> {
         // 构建动态 SQL 查询
         let mut sql = String::from(
             r#"
@@ -368,6 +371,7 @@ impl EpubDatabase {
         );
 
         let mut conditions = Vec::new();
+        conditions.push("b.library_id = ?".to_string());
         let mut has_author_filter = false;
         let mut has_tag_filter = false;
 
@@ -462,6 +466,9 @@ impl EpubDatabase {
 
         // 绑定参数
         let mut query_builder = sqlx::query(&sql);
+
+        // 首先绑定 library_id
+        query_builder = query_builder.bind(library_id);
 
         // 按照条件添加的顺序绑定参数
         if let Some(ref keyword) = query.keyword {

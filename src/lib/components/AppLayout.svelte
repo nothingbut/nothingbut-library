@@ -22,6 +22,8 @@
     if (path.startsWith('/epub')) return 'EPUB 书库';
     if (path === '/music') return '音乐库';
     if (path.startsWith('/music')) return '音乐库';
+    if (path === '/bilibili') return 'B站音频';
+    if (path.startsWith('/bilibili')) return 'B站音频';
     return '';
   });
 

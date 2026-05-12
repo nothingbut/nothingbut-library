@@ -1,7 +1,7 @@
 use crate::errors::AppResult;
 use crate::modules::epub::database::EpubDatabase;
 use crate::modules::epub::models::{
-    EpubBook, EpubBookWithDetails, ImportProgress, ImportResult, SearchQuery,
+    EpubBook, EpubBookWithDetails, EpubChapter, ImportProgress, ImportResult, SearchQuery,
 };
 use crate::modules::epub::parser::EpubParser;
 use crate::modules::epub::storage::EpubStorage;
@@ -30,6 +30,7 @@ pub struct UpdateMetadataRequest {
 #[tauri::command]
 pub async fn import_epub(
     pool: State<'_, SqlitePool>,
+    library_id: i64,
     workspace_path: String,
     source_file_path: String,
 ) -> AppResult<i64> {
@@ -87,7 +88,7 @@ pub async fn import_epub(
         updated_at: now,
     };
 
-    let book_id = db.create_book(&book).await?;
+    let book_id = db.create_book(library_id, &book).await?;
 
     // Step 7: 重命名文件（从 temp_id 到 book_id）
     let final_book_dir = storage.book_dir(book_id);
@@ -123,6 +124,7 @@ pub async fn import_epub(
 #[tauri::command]
 pub async fn batch_import_epub(
     pool: State<'_, SqlitePool>,
+    library_id: i64,
     workspace_path: String,
     file_paths: Vec<String>,
     window: Window,
@@ -151,7 +153,7 @@ pub async fn batch_import_epub(
         }
 
         // 尝试导入
-        match import_epub(pool.clone(), workspace_path.clone(), file_path.clone()).await {
+        match import_epub(pool.clone(), library_id, workspace_path.clone(), file_path.clone()).await {
             Ok(book_id) => {
                 results.push(ImportResult::Success { book_id });
             }
@@ -196,19 +198,43 @@ pub async fn get_epub_book(
 
 /// 列出所有书籍
 #[tauri::command]
-pub async fn list_epub_books(pool: State<'_, SqlitePool>) -> AppResult<Vec<EpubBook>> {
+pub async fn list_epub_books(pool: State<'_, SqlitePool>, library_id: i64) -> AppResult<Vec<EpubBook>> {
     let db = EpubDatabase::new(pool.inner().clone());
-    db.list_books().await
+    db.list_books(library_id).await
+}
+
+/// 列出所有书籍（包含作者和标签详情）
+#[tauri::command]
+pub async fn list_epub_books_with_details(
+    pool: State<'_, SqlitePool>,
+    library_id: i64,
+) -> AppResult<Vec<EpubBookWithDetails>> {
+    let db = EpubDatabase::new(pool.inner().clone());
+    let books = db.list_books(library_id).await?;
+
+    let mut books_with_details = Vec::new();
+    for book in books {
+        let authors = db.get_book_authors(book.id).await?;
+        let tags = db.get_book_tags(book.id).await?;
+        books_with_details.push(EpubBookWithDetails {
+            book,
+            authors,
+            tags,
+        });
+    }
+
+    Ok(books_with_details)
 }
 
 /// 搜索书籍
 #[tauri::command]
 pub async fn search_epub_books(
     pool: State<'_, SqlitePool>,
+    library_id: i64,
     query: SearchQuery,
 ) -> AppResult<Vec<EpubBook>> {
     let db = EpubDatabase::new(pool.inner().clone());
-    db.search_books(&query).await
+    db.search_books(library_id, &query).await
 }
 
 /// 删除书籍
@@ -348,6 +374,53 @@ pub async fn update_epub_cover(
     Ok(())
 }
 
+/// 获取 EPUB 书籍的章节列表
+#[tauri::command]
+pub async fn get_epub_chapters(
+    pool: State<'_, SqlitePool>,
+    book_id: i64,
+) -> AppResult<Vec<EpubChapter>> {
+    let db = EpubDatabase::new(pool.inner().clone());
+
+    // Step 1: 获取书籍信息
+    let book = db.get_book(book_id).await?.ok_or_else(|| {
+        crate::AppError::NotFound(format!("Book {} not found", book_id))
+    })?;
+
+    // Step 2: 打开 EPUB 文件
+    let epub_path = Path::new(&book.file_path);
+    let parser = EpubParser::open(epub_path)?;
+
+    // Step 3: 提取目录
+    let chapters = parser.extract_toc()?;
+
+    Ok(chapters)
+}
+
+/// 获取 EPUB 书籍的章节内容
+#[tauri::command]
+pub async fn get_epub_chapter_content(
+    pool: State<'_, SqlitePool>,
+    book_id: i64,
+    chapter_href: String,
+) -> AppResult<String> {
+    let db = EpubDatabase::new(pool.inner().clone());
+
+    // Step 1: 获取书籍信息
+    let book = db.get_book(book_id).await?.ok_or_else(|| {
+        crate::AppError::NotFound(format!("Book {} not found", book_id))
+    })?;
+
+    // Step 2: 打开 EPUB 文件
+    let epub_path = Path::new(&book.file_path);
+    let parser = EpubParser::open(epub_path)?;
+
+    // Step 3: 获取章节内容
+    let content = parser.get_chapter_content(&chapter_href)?;
+
+    Ok(content)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -450,7 +523,7 @@ mod tests {
         let pool = setup_test_pool().await;
         let db = EpubDatabase::new(pool);
 
-        let books = db.list_books().await.unwrap();
+        let books = db.list_books(1).await.unwrap();
         assert_eq!(books.len(), 0);
     }
 
@@ -484,7 +557,7 @@ mod tests {
             offset: None,
         };
 
-        let books = db.search_books(&query).await.unwrap();
+        let books = db.search_books(1, &query).await.unwrap();
         assert_eq!(books.len(), 0);
     }
 

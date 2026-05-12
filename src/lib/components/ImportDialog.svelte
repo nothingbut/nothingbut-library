@@ -8,11 +8,12 @@
   // Props
   interface Props {
     isOpen?: boolean;
+    libraryId: number;
     onClose?: () => void;
     onSuccess?: () => void;
   }
 
-  let { isOpen = $bindable(false), onClose, onSuccess }: Props = $props();
+  let { isOpen = $bindable(false), libraryId, onClose, onSuccess }: Props = $props();
 
   // State
   let step = $state<'select' | 'parsing' | 'edit' | 'importing' | 'success' | 'error' | 'duplicate-confirm'>('select');
@@ -45,24 +46,82 @@
     try {
       const selected = await open({
         multiple: false,
-        filters: [{
-          name: 'Text',
-          extensions: ['txt']
-        }]
+        filters: [
+          {
+            name: 'Text or Archive',
+            extensions: ['txt', 'zip', '7z']
+          },
+          {
+            name: 'Text Files',
+            extensions: ['txt']
+          },
+          {
+            name: 'Archive Files',
+            extensions: ['zip', '7z']
+          }
+        ]
       });
 
       if (selected && typeof selected === 'string') {
         selectedFile = selected;
         // Extract filename as default title
         const filename = selected.split('/').pop() || '';
-        title = filename.replace('.txt', '');
+        const nameWithoutExt = filename.replace(/\.(txt|zip|7z)$/i, '');
+        title = nameWithoutExt;
 
-        // Immediately parse the file
-        await parseFile();
+        // Check if it's an archive file
+        const isArchive = /\.(zip|7z)$/i.test(selected);
+
+        if (isArchive) {
+          // Extract archive first
+          await extractArchiveAndParse();
+        } else {
+          // Immediately parse the file
+          await parseFile();
+        }
       }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to select file';
       console.error('File selection error:', e);
+    }
+  }
+
+  // Extract single TXT from archive and parse
+  async function extractArchiveAndParse() {
+    if (!selectedFile) {
+      error = 'No archive file selected';
+      return;
+    }
+
+    try {
+      parsing = true;
+      step = 'parsing';
+      error = null;
+
+      console.log('Extracting archive:', selectedFile);
+
+      // Call backend to extract
+      const { invoke } = await import('@tauri-apps/api/core');
+      const extractedPath = await invoke<string>('extract_archive_txt', {
+        archivePath: selectedFile
+      });
+
+      console.log('Extracted TXT file:', extractedPath);
+
+      // Update selectedFile to point to the extracted TXT
+      const originalFile = selectedFile;
+      selectedFile = extractedPath;
+
+      // Parse the extracted file
+      await parseFile();
+
+      // Store original archive path for reference
+      // (The temp extracted file will be used for import)
+    } catch (e: any) {
+      error = e;
+      step = 'select';
+      parsing = false;
+      console.error('Archive extraction error:', e);
     }
   }
 
@@ -119,7 +178,7 @@
   // Check for duplicate books
   async function checkDuplicates() {
     try {
-      const books = await listBooks();
+      const books = await listBooks(libraryId);
       const duplicate = books.find(
         b => b.title === title && b.author === author
       );
@@ -251,23 +310,23 @@
       if (mainCategory) {
         try {
           // Check if main category exists, create if not
-          const categories = await listCategories();
+          const categories = await listCategories(libraryId);
           let mainCat = categories.find(c => c.name === mainCategory && !c.parent_id);
 
           if (!mainCat) {
-            const mainId = await createCategory(mainCategory, undefined, 0);
-            mainCat = { id: mainId, name: mainCategory, parent_id: null, sort_order: 0, created_at: '' };
+            const mainId = await createCategory(libraryId, mainCategory, undefined, 0);
+            mainCat = { id: mainId, library_id: libraryId, name: mainCategory, parent_id: null, sort_order: 0, created_at: '' };
           }
 
           // If subcategory specified, handle it
-          if (subCategory) {
+          if (subCategory && mainCat) {
             let subCat = categories.find(c => c.name === subCategory && c.parent_id === mainCat!.id);
             if (!subCat) {
-              categoryId = await createCategory(subCategory, mainCat.id, 0);
+              categoryId = await createCategory(libraryId, subCategory, mainCat.id, 0);
             } else {
               categoryId = subCat.id;
             }
-          } else {
+          } else if (mainCat) {
             categoryId = mainCat.id;
           }
         } catch (e) {
@@ -277,6 +336,7 @@
 
       // Import the novel
       await importNovel(
+        libraryId,
         workspacePath,
         selectedFile,
         title,

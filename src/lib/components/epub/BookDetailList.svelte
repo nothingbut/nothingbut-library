@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { EpubBook } from '$lib/types/epub';
+	import type { EpubBook, EpubBookWithDetails } from '$lib/types/epub';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 
 	interface Props {
-		books: EpubBook[];
+		books: EpubBookWithDetails[];
 		onSelect: (book: EpubBook) => void;
 	}
 
@@ -12,16 +12,26 @@
 	/**
 	 * Convert a file path to a usable Tauri asset URL
 	 */
-	function getCoverUrl(book: EpubBook): string {
-		if (book.cover_path) {
+	function getCoverUrl(bookWithDetails: EpubBookWithDetails): string {
+		if (bookWithDetails.book.cover_path) {
 			try {
-				return convertFileSrc(book.cover_path);
+				return convertFileSrc(bookWithDetails.book.cover_path);
 			} catch (e) {
-				console.warn(`Failed to convert cover path for book ${book.id}:`, e);
+				console.warn(`Failed to convert cover path for book ${bookWithDetails.book.id}:`, e);
 				return '';
 			}
 		}
 		return '';
+	}
+
+	/**
+	 * Format authors array to string
+	 */
+	function formatAuthors(bookWithDetails: EpubBookWithDetails): string {
+		if (bookWithDetails.authors.length === 0) {
+			return '-';
+		}
+		return bookWithDetails.authors.map((a) => a.name).join(', ');
 	}
 
 	/**
@@ -77,6 +87,7 @@
 			<tr>
 				<th class="col-cover">封面</th>
 				<th class="col-title">标题</th>
+				<th class="col-author">作者</th>
 				<th class="col-series">系列</th>
 				<th class="col-publisher">出版社</th>
 				<th class="col-pubdate">出版日期</th>
@@ -86,16 +97,16 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each books as book (book.id)}
-				<tr class="detail-row" onclick={() => onSelect(book)}>
+			{#each books as bookWithDetails (bookWithDetails.book.id)}
+				<tr class="detail-row" onclick={() => onSelect(bookWithDetails.book)}>
 					<!-- Cover thumbnail -->
 					<td class="col-cover">
 						<div class="cover-thumb">
-							{#if getCoverUrl(book)}
-								<img src={getCoverUrl(book)} alt={book.title} class="cover-image" />
+							{#if getCoverUrl(bookWithDetails)}
+								<img src={getCoverUrl(bookWithDetails)} alt={bookWithDetails.book.title} class="cover-image" />
 							{:else}
 								<div class="cover-placeholder">
-									{getInitial(book.title)}
+									{getInitial(bookWithDetails.book.title)}
 								</div>
 							{/if}
 						</div>
@@ -103,17 +114,24 @@
 
 					<!-- Title -->
 					<td class="col-title">
-						<div class="title-cell" title={book.title}>
-							{book.title}
+						<div class="title-cell" title={bookWithDetails.book.title}>
+							{bookWithDetails.book.title}
+						</div>
+					</td>
+
+					<!-- Author -->
+					<td class="col-author">
+						<div class="author-cell">
+							{formatAuthors(bookWithDetails)}
 						</div>
 					</td>
 
 					<!-- Series -->
 					<td class="col-series">
-						{#if book.series}
+						{#if bookWithDetails.book.series}
 							<div class="series-cell">
-								{book.series}
-								{#if book.series_index !== null}#{book.series_index}{/if}
+								{bookWithDetails.book.series}
+								{#if bookWithDetails.book.series_index !== null}#{bookWithDetails.book.series_index}{/if}
 							</div>
 						{:else}
 							<span class="empty-cell">-</span>
@@ -122,8 +140,8 @@
 
 					<!-- Publisher -->
 					<td class="col-publisher">
-						{#if book.publisher}
-							<div class="publisher-cell">{book.publisher}</div>
+						{#if bookWithDetails.book.publisher}
+							<div class="publisher-cell">{bookWithDetails.book.publisher}</div>
 						{:else}
 							<span class="empty-cell">-</span>
 						{/if}
@@ -131,8 +149,8 @@
 
 					<!-- Pubdate -->
 					<td class="col-pubdate">
-						{#if book.pubdate}
-							<span class="date-cell">{book.pubdate}</span>
+						{#if bookWithDetails.book.pubdate}
+							<span class="date-cell">{bookWithDetails.book.pubdate}</span>
 						{:else}
 							<span class="empty-cell">-</span>
 						{/if}
@@ -140,17 +158,17 @@
 
 					<!-- Rating -->
 					<td class="col-rating">
-						<span class="rating-cell">{getRatingStars(book.rating)}</span>
+						<span class="rating-cell">{getRatingStars(bookWithDetails.book.rating)}</span>
 					</td>
 
 					<!-- Created date -->
 					<td class="col-date">
-						<span class="date-cell">{formatDate(book.created_at)}</span>
+						<span class="date-cell">{formatDate(bookWithDetails.book.created_at)}</span>
 					</td>
 
 					<!-- File size -->
 					<td class="col-size">
-						<span class="size-cell">{formatFileSize(book.file_size)}</span>
+						<span class="size-cell">{formatFileSize(bookWithDetails.book.file_size)}</span>
 					</td>
 				</tr>
 			{/each}
@@ -217,6 +235,10 @@
 		max-width: 300px;
 	}
 
+	.col-author {
+		width: 150px;
+	}
+
 	.col-series {
 		width: 150px;
 	}
@@ -279,6 +301,7 @@
 		line-height: 1.4;
 	}
 
+	.author-cell,
 	.series-cell,
 	.publisher-cell {
 		overflow: hidden;

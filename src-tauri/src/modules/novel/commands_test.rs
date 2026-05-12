@@ -140,7 +140,7 @@ mod tests {
         let workspace = TempDir::new().unwrap();
 
         // Create a category first
-        let category_id = database::insert_category(&pool, "玄幻", None, 0)
+        let category_id = database::insert_category(&pool, 1, "玄幻", None, 0)
             .await
             .unwrap();
 
@@ -161,6 +161,7 @@ mod tests {
         // Insert book
         let book_id = database::insert_book(
             &pool,
+            1,
             "测试小说",
             Some("测试作者"),
             Some("这是一个测试小说"),
@@ -220,7 +221,7 @@ mod tests {
         storage::save_metadata(&book_dir, &metadata).unwrap();
 
         // Verify book was inserted
-        let books = database::list_books(&pool).await.unwrap();
+        let books = database::list_books(&pool, 1).await.unwrap();
         assert_eq!(books.len(), 1);
         assert_eq!(books[0].title, "测试小说");
         assert_eq!(books[0].author, Some("测试作者".to_string()));
@@ -268,6 +269,7 @@ mod tests {
         // Import without category
         let _book_id = database::insert_book(
             &pool,
+            1,
             "无分类小说",
             None,
             None,
@@ -283,7 +285,7 @@ mod tests {
         .await
         .unwrap();
 
-        let books = database::list_books(&pool).await.unwrap();
+        let books = database::list_books(&pool, 1).await.unwrap();
         assert_eq!(books.len(), 1);
         assert_eq!(books[0].title, "无分类小说");
         assert_eq!(books[0].category_id, None);
@@ -296,6 +298,7 @@ mod tests {
         // Insert test data
         let book_id = database::insert_book(
             &pool,
+            1,
             "测试书籍",
             Some("作者"),
             Some("描述"),
@@ -336,7 +339,7 @@ mod tests {
         .unwrap();
 
         // Test list_books
-        let books = database::list_books(&pool).await.unwrap();
+        let books = database::list_books(&pool, 1).await.unwrap();
         assert_eq!(books.len(), 1);
         assert_eq!(books[0].title, "测试书籍");
 
@@ -355,6 +358,7 @@ mod tests {
         // Create a book and chapter
         let book_id = database::insert_book(
             &pool,
+            1,
             "Test Book",
             None,
             None,
@@ -406,19 +410,19 @@ mod tests {
         let pool = setup_test_db().await;
 
         // Create main category
-        let parent_id = database::insert_category(&pool, "玄幻", None, 0)
+        let parent_id = database::insert_category(&pool, 1, "玄幻", None, 0)
             .await
             .unwrap();
 
         // Create subcategory
-        let sub_id = database::insert_category(&pool, "东方玄幻", Some(parent_id), 0)
+        let sub_id = database::insert_category(&pool, 1, "东方玄幻", Some(parent_id), 0)
             .await
             .unwrap();
 
         assert!(sub_id > parent_id);
 
         // List categories
-        let categories = database::list_categories(&pool).await.unwrap();
+        let categories = database::list_categories(&pool, 1).await.unwrap();
         assert_eq!(categories.len(), 2);
         assert_eq!(categories[0].name, "玄幻");
         assert_eq!(categories[0].parent_id, None);

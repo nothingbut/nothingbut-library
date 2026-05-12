@@ -36,6 +36,7 @@ export async function previewImport(
  * Complete import flow: parse → save files → insert to DB
  */
 export async function importNovel(
+	libraryId: number,
 	workspacePath: string,
 	filePath: string,
 	title: string,
@@ -45,6 +46,7 @@ export async function importNovel(
 	sourceSite?: string
 ): Promise<number> {
 	return await invoke('import_novel', {
+		libraryId,
 		workspacePath,
 		filePath,
 		title,
@@ -56,10 +58,10 @@ export async function importNovel(
 }
 
 /**
- * List all books
+ * List all books in a specific library
  */
-export async function listBooks(): Promise<Book[]> {
-	return await invoke('list_books');
+export async function listBooks(libraryId: number): Promise<Book[]> {
+	return await invoke('list_books', { libraryId });
 }
 
 /**
@@ -75,11 +77,13 @@ export async function listChapters(bookId: number): Promise<Chapter[]> {
  * Create a new category
  */
 export async function createCategory(
+	libraryId: number,
 	name: string,
 	parentId?: number,
 	sortOrder: number = 0
 ): Promise<number> {
 	return await invoke('create_category', {
+		libraryId,
 		name,
 		parentId,
 		sortOrder
@@ -87,10 +91,10 @@ export async function createCategory(
 }
 
 /**
- * List all categories
+ * List all categories for a specific library
  */
-export async function listCategories(): Promise<Category[]> {
-	return await invoke('list_categories');
+export async function listCategories(libraryId: number): Promise<Category[]> {
+	return await invoke('list_categories', { libraryId });
 }
 
 /**
@@ -135,10 +139,12 @@ export async function fetchBookMetadata(
  * Delete a book
  */
 export async function deleteBook(
+	libraryId: number,
 	workspacePath: string,
 	bookId: number
 ): Promise<void> {
 	return await invoke('delete_book', {
+		libraryId,
 		workspacePath,
 		bookId
 	});

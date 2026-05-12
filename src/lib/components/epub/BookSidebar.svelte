@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { convertFileSrc } from '@tauri-apps/api/core';
 	import type { EpubBook, EpubBookWithDetails } from '$lib/types/epub';
 	import { EpubService } from '$lib/services/epub';
@@ -14,10 +15,10 @@
 
 	let { book, onClose, onDeleted }: Props = $props();
 
-	let bookDetails: EpubBookWithDetails | null = $state(null);
-	let editMode: boolean = $state(false);
-	let loading: boolean = $state(true);
-	let error: string | null = $state(null);
+	let bookDetails = $state.raw<EpubBookWithDetails | null>(null);
+	let editMode = $state(false);
+	let loading = $state(true);
+	let error = $state<string | null>(null);
 
 	/**
 	 * Load full book details on component mount
@@ -26,16 +27,20 @@
 		loading = true;
 		error = null;
 		try {
+			console.log('[BookSidebar] Loading book details for ID:', book.id);
 			bookDetails = await EpubService.getBook(book.id);
+			console.log('[BookSidebar] Loaded bookDetails successfully:', !!bookDetails);
 			if (!bookDetails) {
 				error = '无法加载书籍详情';
+				console.error('[BookSidebar] bookDetails is null');
 			}
 		} catch (err) {
 			const message = err instanceof Error ? err.message : '加载失败';
 			error = `加载失败: ${message}`;
-			console.error('Failed to load book details:', err);
+			console.error('[BookSidebar] Failed to load book details:', err);
 		} finally {
 			loading = false;
+			console.log('[BookSidebar] Loading complete. loading:', loading, 'hasDetails:', !!bookDetails);
 		}
 	}
 
@@ -129,8 +134,7 @@
 	 * Handle start reading
 	 */
 	function handleStartReading(): void {
-		// TODO: Implement reading functionality
-		console.log('Start reading:', book.id);
+		goto(`/reader/epub/${book.id}`);
 	}
 
 	/**

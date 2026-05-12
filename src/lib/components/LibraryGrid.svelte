@@ -6,10 +6,11 @@
 
   // Props
   interface Props {
+    libraryId: number;
     onImport?: () => void;
   }
 
-  let { onImport }: Props = $props();
+  let { libraryId, onImport }: Props = $props();
 
   let books = $state<Book[]>([]);
   let loading = $state(false);
@@ -19,7 +20,7 @@
     try {
       loading = true;
       error = null;
-      books = await listBooks();
+      books = await listBooks(libraryId);
       console.log('Loaded books:', books.length);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load books';
