@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { open } from '@tauri-apps/plugin-dialog';
   import type { Library } from '$lib/types/library';
   import type { WereadAccount, WereadBook, WereadChapter, WereadDownload } from '$lib/types/weread';
   import { listLibraries, getCurrentLibrary, createLibrary, setCurrentLibrary } from '$lib/services/library';
@@ -15,6 +16,7 @@
   let loading = false;
   let viewMode: 'cover' | 'list' = 'cover';
   let selectedBookIds = new Set<number>();
+  let outputDir = '~/Downloads/WeRead';
 
   async function initLibrary() {
     try {
@@ -133,9 +135,16 @@
     selectedBookIds = new Set<number>();
   }
 
+  async function pickOutputDir() {
+    const selected = await open({ directory: true, title: '选择 EPUB 输出目录' });
+    if (selected) {
+      outputDir = selected as string;
+    }
+  }
+
   async function handleBatchExport() {
     if (!currentLibrary || selectedBookIds.size === 0) return;
-    const outputDir = '~/Downloads/WeRead';
+    const count = selectedBookIds.size;
     for (const bookId of selectedBookIds) {
       try {
         await weread.startExport(currentLibrary.id, bookId, outputDir);
@@ -144,7 +153,7 @@
       }
     }
     selectedBookIds = new Set<number>();
-    alert(`已启动 ${selectedBookIds.size} 本书的导出`);
+    alert(`已启动 ${count} 本书的导出`);
   }
 
   // 书籍详情/导出
@@ -179,7 +188,6 @@
 
   async function handleExport() {
     if (!currentLibrary || !selectedBook) return;
-    const outputDir = '~/Downloads/WeRead';
     exporting = true;
     try {
       await weread.startExport(currentLibrary.id, selectedBook.id, outputDir);
@@ -261,6 +269,14 @@
         disabled={syncing}
       >
         {syncing ? '同步中...' : '同步书架'}
+      </button>
+
+      <button
+        class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 truncate max-w-48"
+        on:click={pickOutputDir}
+        title="点击修改输出目录: {outputDir}"
+      >
+        📁 {outputDir.split('/').pop()}
       </button>
 
       <input
