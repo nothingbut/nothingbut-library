@@ -34,6 +34,7 @@
   let selectedVideoIds = new Set<number>();
   let videoLoading = false;
   let syncingVideos = false;
+  let videoViewMode: 'list' | 'cover' = 'list';
 
   // 下载
   let downloads: BilibiliDownload[] = [];
@@ -444,6 +445,19 @@
 
           <span class="text-sm text-gray-500">已选 {selectedVideoIds.size} 个</span>
 
+          <div class="flex border rounded overflow-hidden">
+            <button
+              class="px-2 py-1 text-xs {videoViewMode === 'list' ? 'bg-pink-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+              on:click={() => videoViewMode = 'list'}
+              title="列表"
+            >☰</button>
+            <button
+              class="px-2 py-1 text-xs {videoViewMode === 'cover' ? 'bg-pink-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+              on:click={() => videoViewMode = 'cover'}
+              title="封面"
+            >▦</button>
+          </div>
+
           <button
             class="px-4 py-1.5 bg-pink-500 text-white rounded-lg text-sm hover:bg-pink-600 disabled:opacity-50"
             on:click={handleDownload}
@@ -463,7 +477,7 @@
             <div class="p-8 text-center text-gray-400">
               {videos.length === 0 ? '点击「同步视频列表」获取视频' : '没有匹配的视频'}
             </div>
-          {:else}
+          {:else if videoViewMode === 'list'}
             {#each filteredVideos as video}
               <label
                 class="flex items-center gap-3 px-4 py-3 border-b hover:bg-gray-50 cursor-pointer
@@ -490,6 +504,33 @@
                 </div>
               </label>
             {/each}
+          {:else}
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-4">
+              {#each filteredVideos as video}
+                <label
+                  class="relative rounded-lg overflow-hidden border cursor-pointer
+                    {selectedVideoIds.has(video.id) ? 'ring-2 ring-pink-500' : ''}"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedVideoIds.has(video.id)}
+                    on:change={() => toggleVideo(video.id)}
+                    class="absolute top-2 left-2 w-4 h-4 accent-pink-500 z-10"
+                  />
+                  {#if video.coverUrl}
+                    <img src={video.coverUrl} alt="" class="w-full aspect-video object-cover" />
+                  {:else}
+                    <div class="w-full aspect-video bg-gray-200 flex items-center justify-center">📺</div>
+                  {/if}
+                  <div class="p-2">
+                    <div class="text-xs font-medium truncate">{video.title}</div>
+                    <div class="text-xs text-gray-400 mt-0.5">
+                      {bili.formatDuration(video.duration)} · {bili.formatPlayCount(video.playCount)}
+                    </div>
+                  </div>
+                </label>
+              {/each}
+            </div>
           {/if}
         </div>
       {:else}

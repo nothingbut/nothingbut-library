@@ -13,6 +13,8 @@
   let searchQuery = '';
   let syncing = false;
   let loading = false;
+  let viewMode: 'cover' | 'list' = 'cover';
+  let selectedBookIds = new Set<number>();
 
   async function initLibrary() {
     try {
@@ -111,6 +113,38 @@
     currentLibrary = libraries.find(l => l.id === id) ?? null;
     books = [];
     await loadBooks();
+  }
+
+  function toggleBookSelect(id: number) {
+    const next = new Set(selectedBookIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    selectedBookIds = next;
+  }
+
+  function selectAllBooks() {
+    selectedBookIds = new Set(filteredBooks.map((b: WereadBook) => b.id));
+  }
+
+  function deselectAllBooks() {
+    selectedBookIds = new Set<number>();
+  }
+
+  async function handleBatchExport() {
+    if (!currentLibrary || selectedBookIds.size === 0) return;
+    const outputDir = '~/Downloads/WeRead';
+    for (const bookId of selectedBookIds) {
+      try {
+        await weread.startExport(currentLibrary.id, bookId, outputDir);
+      } catch (e) {
+        console.error(`[weread] export book ${bookId} failed:`, e);
+      }
+    }
+    selectedBookIds = new Set<number>();
+    alert(`已启动 ${selectedBookIds.size} 本书的导出`);
   }
 
   // 书籍详情/导出
@@ -238,7 +272,29 @@
       />
 
       <div class="flex-1"></div>
+
+      {#if viewMode === 'list' && selectedBookIds.size > 0}
+        <button class="text-sm text-green-600 hover:underline" on:click={handleBatchExport}>
+          导出选中 ({selectedBookIds.size})
+        </button>
+        <button class="text-sm text-gray-500 hover:underline" on:click={selectAllBooks}>全选</button>
+        <button class="text-sm text-gray-500 hover:underline" on:click={deselectAllBooks}>取消</button>
+      {/if}
+
       <span class="text-sm text-gray-500">{books.length} 本书</span>
+
+      <div class="flex border rounded-lg overflow-hidden">
+        <button
+          class="px-2.5 py-1 text-sm {viewMode === 'cover' ? 'bg-green-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+          on:click={() => viewMode = 'cover'}
+          title="封面模式"
+        >▦</button>
+        <button
+          class="px-2.5 py-1 text-sm {viewMode === 'list' ? 'bg-green-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+          on:click={() => viewMode = 'list'}
+          title="列表模式"
+        >☰</button>
+      </div>
     </div>
 
     <!-- 书籍列表 -->
@@ -251,7 +307,7 @@
         <div class="text-center text-gray-400 py-12">
           {books.length === 0 ? '点击「同步书架」获取书籍列表' : '没有匹配的书籍'}
         </div>
-      {:else}
+      {:else if viewMode === 'cover'}
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {#each filteredBooks as book}
             <button
@@ -273,6 +329,35 @@
               <div class="text-xs text-gray-400 truncate mt-0.5">{book.author || '未知作者'}</div>
               <div class="text-xs text-gray-300 mt-1">{weread.formatWordCount(book.wordCount)}</div>
             </button>
+          {/each}
+        </div>
+      {:else}
+        <div class="space-y-1">
+          {#each filteredBooks as book}
+            <label
+              class="flex items-center gap-3 px-4 py-3 bg-white border-b hover:bg-gray-50 cursor-pointer
+                {selectedBookIds.has(book.id) ? 'bg-green-50' : ''}"
+            >
+              <input
+                type="checkbox"
+                checked={selectedBookIds.has(book.id)}
+                on:change={() => toggleBookSelect(book.id)}
+                class="w-4 h-4 accent-green-500"
+              />
+              {#if book.coverUrl}
+                <img src={book.coverUrl} alt="" class="w-10 h-14 object-cover rounded flex-shrink-0" />
+              {:else}
+                <div class="w-10 h-14 bg-green-100 rounded flex-shrink-0 flex items-center justify-center text-xs">📖</div>
+              {/if}
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium truncate">{book.title}</div>
+                <div class="text-xs text-gray-400 mt-0.5">{book.author || '未知作者'} · {weread.formatWordCount(book.wordCount)} · {book.chapterCount} 章</div>
+              </div>
+              <button
+                class="text-xs text-green-600 hover:underline px-2 py-1"
+                on:click|stopPropagation={() => selectBook(book)}
+              >详情</button>
+            </label>
           {/each}
         </div>
       {/if}
