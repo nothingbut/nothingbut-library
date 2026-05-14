@@ -421,29 +421,27 @@
     <div class="flex-1 flex flex-col">
       {#if selectedUploader}
         <!-- 工具栏 -->
-        <div class="flex items-center gap-3 px-4 py-2.5 bg-white border-b">
-          <span class="font-medium">{selectedUploader.name}</span>
+        <div class="flex flex-wrap items-center gap-2 px-4 py-2 bg-white border-b">
+          <span class="font-medium text-sm">{selectedUploader.name}</span>
           <button
-            class="px-3 py-1 text-sm border rounded hover:bg-gray-50 disabled:opacity-50"
+            class="px-2 py-1 text-xs border rounded hover:bg-gray-50 disabled:opacity-50"
             on:click={handleSyncVideos}
             disabled={syncingVideos}
           >
-            {syncingVideos ? '同步中...' : '同步视频列表'}
+            {syncingVideos ? '同步中...' : '同步'}
           </button>
 
           <input
             type="text"
-            placeholder="搜索视频..."
+            placeholder="搜索..."
             bind:value={searchQuery}
-            class="px-3 py-1 border rounded text-sm w-48"
+            class="px-2 py-1 border rounded text-xs w-32"
           />
 
-          <div class="flex-1"></div>
+          <button class="text-xs text-pink-600 hover:underline" on:click={selectAll}>全选</button>
+          <button class="text-xs text-gray-500 hover:underline" on:click={deselectAll}>取消</button>
 
-          <button class="text-sm text-pink-600 hover:underline" on:click={selectAll}>全选</button>
-          <button class="text-sm text-gray-500 hover:underline" on:click={deselectAll}>取消</button>
-
-          <span class="text-sm text-gray-500">已选 {selectedVideoIds.size} 个</span>
+          <span class="text-xs text-gray-500">已选{selectedVideoIds.size}</span>
 
           <div class="flex border rounded overflow-hidden">
             <button
@@ -459,7 +457,7 @@
           </div>
 
           <button
-            class="px-4 py-1.5 bg-pink-500 text-white rounded-lg text-sm hover:bg-pink-600 disabled:opacity-50"
+            class="px-3 py-1 bg-pink-500 text-white rounded text-xs hover:bg-pink-600 disabled:opacity-50"
             on:click={handleDownload}
             disabled={selectedVideoIds.size === 0 || isDownloading}
           >
