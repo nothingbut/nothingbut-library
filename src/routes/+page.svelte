@@ -20,6 +20,7 @@
     { id: 'epub', name: '（测试）电子书库', icon: '📖', available: true },
     { id: 'music', name: '（测试）音乐库', icon: '🎵', available: true },
     { id: 'bilibili', name: 'B站音频', icon: '📺', available: true },
+    { id: 'weread', name: '微信读书', icon: '📱', available: true },
     { id: 'note', name: '笔记', icon: '📝', available: false },
   ];
 

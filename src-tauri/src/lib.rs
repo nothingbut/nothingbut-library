@@ -180,6 +180,18 @@ pub fn run() {
             modules::bilibili::commands::bilibili_get_settings,
             modules::bilibili::commands::bilibili_set_download_dir,
             modules::bilibili::commands::bilibili_set_audio_format,
+            modules::weread::commands::weread_get_account,
+            modules::weread::commands::weread_check_cookie,
+            modules::weread::commands::weread_save_login,
+            modules::weread::commands::weread_logout,
+            modules::weread::commands::weread_open_login,
+            modules::weread::commands::weread_sync_books,
+            modules::weread::commands::weread_list_books,
+            modules::weread::commands::weread_search_books,
+            modules::weread::commands::weread_get_book_detail,
+            modules::weread::commands::weread_start_export,
+            modules::weread::commands::weread_get_export_progress,
+            modules::weread::commands::weread_list_downloads,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -24,6 +24,8 @@
     if (path.startsWith('/music')) return '音乐库';
     if (path === '/bilibili') return 'B站音频';
     if (path.startsWith('/bilibili')) return 'B站音频';
+    if (path === '/weread') return '微信读书';
+    if (path.startsWith('/weread')) return '微信读书';
     return '';
   });
 

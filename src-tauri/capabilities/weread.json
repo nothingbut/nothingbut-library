@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "weread",
+  "description": "Capability for WeRead login and extractor windows",
+  "windows": ["weread-login", "weread-extractor"],
+  "permissions": [
+    "core:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen"
+  ],
+  "remote": {
+    "urls": ["https://weread.qq.com/*"]
+  }
+}
