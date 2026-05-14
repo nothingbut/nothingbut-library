@@ -44,9 +44,12 @@
       const status = await weread.checkCookie();
       if (status.loggedIn) {
         account = status.account;
+      } else {
+        handleLogin();
       }
     } catch (e) {
       console.error('[weread] checkCookie 失败:', e);
+      handleLogin();
     }
 
     await initLibrary();
