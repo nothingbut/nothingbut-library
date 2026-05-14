@@ -303,7 +303,7 @@
     {#if account}
       <div class="flex items-center gap-2 text-sm">
         {#if account.avatarUrl}
-          <img src={account.avatarUrl} alt="" class="w-6 h-6 rounded-full" />
+          <img src={account.avatarUrl} alt="" class="w-6 h-6 rounded-full" referrerpolicy="no-referrer" />
         {/if}
         <span class="text-gray-700">{account.username}</span>
         <button class="text-gray-400 hover:text-red-500 text-xs" on:click={handleLogout}>退出</button>
@@ -395,7 +395,7 @@
             on:keydown={(e) => e.key === 'Enter' && selectUploader(uploader)}
           >
             {#if uploader.faceUrl}
-              <img src={uploader.faceUrl} alt="" class="w-8 h-8 rounded-full flex-shrink-0" />
+              <img src={uploader.faceUrl} alt="" class="w-8 h-8 rounded-full flex-shrink-0" referrerpolicy="no-referrer" />
             {:else}
               <div class="w-8 h-8 rounded-full bg-gray-200 flex-shrink-0"></div>
             {/if}
@@ -490,7 +490,7 @@
                   class="w-4 h-4 accent-pink-500"
                 />
                 {#if video.coverUrl}
-                  <img src={video.coverUrl} alt="" class="w-24 h-14 object-cover rounded flex-shrink-0" />
+                  <img src={video.coverUrl} alt="" class="w-24 h-14 object-cover rounded flex-shrink-0" referrerpolicy="no-referrer" />
                 {/if}
                 <div class="flex-1 min-w-0">
                   <div class="text-sm font-medium truncate">{video.title}</div>
@@ -518,7 +518,7 @@
                     class="absolute top-2 left-2 w-4 h-4 accent-pink-500 z-10"
                   />
                   {#if video.coverUrl}
-                    <img src={video.coverUrl} alt="" class="w-full aspect-video object-cover" />
+                    <img src={video.coverUrl} alt="" class="w-full aspect-video object-cover" referrerpolicy="no-referrer" />
                   {:else}
                     <div class="w-full aspect-video bg-gray-200 flex items-center justify-center">📺</div>
                   {/if}
