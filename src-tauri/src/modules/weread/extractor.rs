@@ -1,4 +1,4 @@
-use headless_chrome::protocol::cdp::Network;
+use headless_chrome::protocol::cdp::{Network, Page};
 use headless_chrome::{Browser, LaunchOptions};
 use sqlx::SqlitePool;
 use std::time::Duration;
@@ -131,7 +131,15 @@ fn extract_chapters_sync(
     tab.set_cookies(cookie_params)
         .map_err(|e| format!("设置 cookies 失败: {}", e))?;
 
-    println!("[weread-extract] cookies set, starting chapter extraction...");
+    tab.call_method(Page::AddScriptToEvaluateOnNewDocument {
+        source: HOOK_JS.to_string(),
+        world_name: None,
+        include_command_line_api: None,
+        run_immediately: None,
+    })
+    .map_err(|e| format!("注册 Canvas Hook 失败: {}", e))?;
+
+    println!("[weread-extract] cookies set, hook registered, starting chapter extraction...");
 
     for (i, chapter) in chapters.iter().enumerate() {
         if chapter.content_md.is_some() {
@@ -155,11 +163,6 @@ fn extract_chapters_sync(
             .map_err(|e| format!("导航到章节失败: {}", e))?;
 
         std::thread::sleep(Duration::from_secs(PAGE_RENDER_WAIT_SECS));
-
-        tab.evaluate(HOOK_JS, false)
-            .map_err(|e| format!("注入 Hook 失败: {}", e))?;
-
-        std::thread::sleep(Duration::from_secs(2));
 
         tab.evaluate("window.__wereadMarkComplete();", false).ok();
 
