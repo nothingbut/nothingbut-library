@@ -17,12 +17,14 @@ pub async fn build_epub(
 
     let chapters = database::list_chapters(pool, library_id, book_id).await?;
 
+    let expanded_dir = expand_tilde(output_dir);
+
     let filename = sanitize_filename(&format!(
         "{} - {}.epub",
         book.title,
         book.author.as_deref().unwrap_or("未知")
     ));
-    let output_path = output_dir.join(&filename);
+    let output_path = expanded_dir.join(&filename);
 
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)
@@ -178,4 +180,14 @@ fn sanitize_filename(name: &str) -> String {
             _ => c,
         })
         .collect()
+}
+
+fn expand_tilde(path: &Path) -> PathBuf {
+    let s = path.to_string_lossy();
+    if s.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(&s[2..]);
+        }
+    }
+    path.to_path_buf()
 }
