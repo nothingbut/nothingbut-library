@@ -6,8 +6,8 @@ use std::time::Duration;
 use super::{database, hash};
 
 const HOOK_JS: &str = include_str!("hook.js");
-const CHAPTER_DELAY_SECS: u64 = 30;
-const PAGE_RENDER_WAIT_SECS: u64 = 8;
+const CHAPTER_DELAY_SECS: u64 = 5;
+const PAGE_RENDER_WAIT_SECS: u64 = 3;
 
 pub async fn extract_book(
     pool: &SqlitePool,
@@ -87,7 +87,7 @@ fn extract_chapters_sync(
     tab.navigate_to("https://weread.qq.com")
         .map_err(|e| format!("导航到首页失败: {}", e))?;
 
-    std::thread::sleep(Duration::from_secs(5));
+    std::thread::sleep(Duration::from_secs(3));
 
     println!("[weread-extract] setting cookies...");
 
@@ -154,18 +154,14 @@ fn extract_chapters_sync(
         tab.navigate_to(&url)
             .map_err(|e| format!("导航到章节失败: {}", e))?;
 
-        std::thread::sleep(Duration::from_secs(3));
-
         std::thread::sleep(Duration::from_secs(PAGE_RENDER_WAIT_SECS));
 
         tab.evaluate(HOOK_JS, false)
             .map_err(|e| format!("注入 Hook 失败: {}", e))?;
 
-        std::thread::sleep(Duration::from_secs(3));
+        std::thread::sleep(Duration::from_secs(2));
 
         tab.evaluate("window.__wereadMarkComplete();", false).ok();
-
-        std::thread::sleep(Duration::from_secs(2));
 
         let multi_page_js = r#"
             (function() {
@@ -181,7 +177,7 @@ fn extract_chapters_sync(
         "#;
         tab.evaluate(multi_page_js, false).ok();
 
-        std::thread::sleep(Duration::from_secs(2));
+        std::thread::sleep(Duration::from_secs(1));
 
         let content_result = tab.evaluate(
             "JSON.stringify(window.__wereadExtracted ? window.__wereadExtracted.content : '')",
